@@ -3,28 +3,9 @@
 <head>
 <title>Registro</title>
 <style>
-body{
-    background:#020617;
-    color:white;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    height:100vh;
-    font-family:Arial;
-}
-.box{
-    background:#1e293b;
-    padding:30px;
-    border-radius:12px;
-}
-input,button{
-    display:block;
-    width:100%;
-    margin:10px 0;
-    padding:10px;
-    border:none;
-    border-radius:6px;
-}
+body{background:#020617;color:white;font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh}
+.box{background:#1e293b;padding:30px;border-radius:12px;width:300px}
+input,button{width:100%;padding:10px;margin:10px 0;border:none;border-radius:6px}
 button{background:#22c55e;color:white}
 .error{color:red;text-align:center}
 </style>
@@ -32,16 +13,14 @@ button{background:#22c55e;color:white}
 <body>
 
 <div class="box">
-<h2>Crear cuenta</h2>
+<h2>Registro</h2>
 
-{% if error %}
-<p class="error">{{ error }}</p>
-{% endif %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
 
 <form method="POST">
 <input name="usuario" placeholder="Usuario" required>
-<input name="password" type="password" placeholder="Contraseña" required>
-<button>Crear usuario</button>
+<input type="password" name="password" placeholder="Contraseña" required>
+<button>Crear cuenta</button>
 </form>
 
 </div>
