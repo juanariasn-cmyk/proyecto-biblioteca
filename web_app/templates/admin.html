@@ -1,32 +1,74 @@
-<h1>👑 ADMIN</h1>
+<!DOCTYPE html>
+<html>
+<head>
+<title>Admin</title>
+<style>
+body{
+    background:#0f172a;
+    color:white;
+    font-family:Arial;
+}
+.container{
+    width:90%;
+    margin:auto;
+}
+.card{
+    background:#1e293b;
+    padding:15px;
+    margin:10px;
+    border-radius:10px;
+}
+input,button{
+    padding:8px;
+    margin:5px;
+}
+button{
+    background:#22c55e;
+    border:none;
+    color:white;
+    cursor:pointer;
+}
+</style>
+</head>
 
+<body>
+
+<div class="container">
+
+<h1>👑 ADMIN</h1>
 <a href="/logout">Salir</a>
 
-<h2>➕ Agregar libro</h2>
+<div class="card">
+<h3>➕ Agregar libro</h3>
 
-<form method="POST" action="/add_book" enctype="multipart/form-data">
+<form action="/add_book" method="POST" enctype="multipart/form-data">
 <input name="titulo" placeholder="Título" required>
 <input name="autor" placeholder="Autor" required>
-<input type="file" name="imagen" required>
+<input type="file" name="imagen">
 <button>Agregar</button>
 </form>
+</div>
 
-<h2>📚 Libros</h2>
+<div class="card">
+<h3>📚 Libros</h3>
 
 {% for l in libros %}
-<div style="border:1px solid #ccc; margin:10px; padding:10px;">
-<img src="{{ url_for('static', filename='uploads/' + l[3]) }}" width="80">
-{{ l[1] }}
+<div style="margin:10px; border-bottom:1px solid gray;">
+<img src="{{ url_for('static', filename='uploads/' + (l[3] or 'default.png')) }}" width="80">
+<b>{{ l[1] }}</b> - {{ l[2] }}
 
 {% if l[4]==1 %}
-Disponible
+<span style="color:lightgreen;">Disponible</span>
 {% else %}
-Prestado
+<span style="color:red;">Prestado</span>
 {% endif %}
 </div>
 {% endfor %}
 
-<h2>📖 Préstamos</h2>
+</div>
+
+<div class="card">
+<h3>📖 Préstamos</h3>
 
 {% for p in prestamos %}
 <div>
@@ -35,13 +77,21 @@ Prestado
 {% if p[4]==0 %}
 <a href="/devolver/{{ p[0] }}">Devolver</a>
 {% else %}
-Devuelto
+✔
 {% endif %}
 </div>
 {% endfor %}
+</div>
 
-<h2>👤 Usuarios</h2>
+<div class="card">
+<h3>👤 Usuarios</h3>
 
 {% for u in users %}
 <div>{{ u[1] }} - {{ u[3] }}</div>
 {% endfor %}
+</div>
+
+</div>
+
+</body>
+</html>
