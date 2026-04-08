@@ -1,13 +1,16 @@
 from flask import Flask, render_template, request, redirect, session, flash
-import sqlite3, os
+import sqlite3
+import os
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = "super_secret"
+app.secret_key = "super_secret_key"
 
+# conexión DB
 def db():
     return sqlite3.connect("db.db", check_same_thread=False)
 
+# crear tablas automáticamente
 def init_db():
     conn = db()
     cur = conn.cursor()
@@ -25,14 +28,6 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nombre TEXT,
         autor TEXT
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS prestamos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        libro_id INTEGER,
-        usuario TEXT
     )
     """)
 
@@ -57,10 +52,9 @@ def login():
             session["user"] = u
             return redirect("/dashboard")
         else:
-            flash("Credenciales incorrectas")
+            flash("Usuario o contraseña incorrectos")
 
     return render_template("login.html")
-
 
 # 🧾 REGISTRO
 @app.route("/register", methods=["GET","POST"])
@@ -74,13 +68,12 @@ def register():
         try:
             cur.execute("INSERT INTO users (user, pass) VALUES (?,?)", (u,p))
             conn.commit()
-            flash("Usuario creado")
+            flash("Usuario creado correctamente")
             return redirect("/")
         except:
-            flash("Usuario ya existe")
+            flash("El usuario ya existe")
 
     return render_template("register.html")
-
 
 # 📊 DASHBOARD
 @app.route("/dashboard")
@@ -97,14 +90,9 @@ def dashboard():
     cur.execute("SELECT COUNT(*) FROM books")
     total_libros = cur.fetchone()[0]
 
-    cur.execute("SELECT COUNT(*) FROM prestamos")
-    total_prestamos = cur.fetchone()[0]
-
     return render_template("dashboard.html",
                            libros=libros,
-                           total_libros=total_libros,
-                           total_prestamos=total_prestamos)
-
+                           total_libros=total_libros)
 
 # ➕ AGREGAR LIBRO
 @app.route("/add", methods=["POST"])
@@ -120,8 +108,7 @@ def add():
     flash("Libro agregado")
     return redirect("/dashboard")
 
-
-# ❌ ELIMINAR
+# ❌ ELIMINAR LIBRO
 @app.route("/delete/<int:id>")
 def delete(id):
     conn = db()
@@ -132,44 +119,13 @@ def delete(id):
     flash("Libro eliminado")
     return redirect("/dashboard")
 
-
-# 📚 PRESTAR LIBRO
-@app.route("/prestar/<int:id>")
-def prestar(id):
-    user = session["user"]
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO prestamos (libro_id, usuario) VALUES (?,?)", (id,user))
-    conn.commit()
-
-    flash("Libro prestado")
-    return redirect("/dashboard")
-
-
-# 🔎 BUSCAR
-@app.route("/search", methods=["POST"])
-def search():
-    query = request.form["query"]
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM books WHERE nombre LIKE ?", ('%'+query+'%',))
-    libros = cur.fetchall()
-
-    return render_template("dashboard.html",
-                           libros=libros,
-                           total_libros=len(libros),
-                           total_prestamos=0)
-
-
 # 🚪 LOGOUT
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
 
-
+# 🔥 CONFIG RENDER
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
