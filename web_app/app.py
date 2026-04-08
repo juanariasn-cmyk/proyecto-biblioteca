@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session
+from flask import Flask, render_template, request, redirect, session, flash
 import sqlite3
 import os
 
@@ -13,7 +13,13 @@ def init_db():
     cur = conn.cursor()
 
     cur.execute("CREATE TABLE IF NOT EXISTS users (user TEXT, pass TEXT)")
-    cur.execute("CREATE TABLE IF NOT EXISTS books (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, autor TEXT)")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS books (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT,
+            autor TEXT
+        )
+    """)
 
     # usuario default
     cur.execute("SELECT * FROM users WHERE user='admin'")
@@ -36,26 +42,37 @@ def login():
         if cur.fetchone():
             session["user"] = u
             return redirect("/dashboard")
+        else:
+            flash("Credenciales incorrectas")
     return render_template("login.html")
 
 @app.route("/dashboard")
 def dashboard():
     if "user" not in session:
         return redirect("/")
+
     conn = db()
     cur = conn.cursor()
+
     cur.execute("SELECT * FROM books")
     libros = cur.fetchall()
-    return render_template("dashboard.html", libros=libros)
+
+    cur.execute("SELECT COUNT(*) FROM books")
+    total = cur.fetchone()[0]
+
+    return render_template("dashboard.html", libros=libros, total=total)
 
 @app.route("/add", methods=["POST"])
 def add():
     nombre = request.form["nombre"]
     autor = request.form["autor"]
+
     conn = db()
     cur = conn.cursor()
     cur.execute("INSERT INTO books (nombre, autor) VALUES (?,?)", (nombre, autor))
     conn.commit()
+
+    flash("Libro agregado correctamente")
     return redirect("/dashboard")
 
 @app.route("/delete/<int:id>")
@@ -64,7 +81,20 @@ def delete(id):
     cur = conn.cursor()
     cur.execute("DELETE FROM books WHERE id=?", (id,))
     conn.commit()
+
+    flash("Libro eliminado")
     return redirect("/dashboard")
+
+@app.route("/search", methods=["POST"])
+def search():
+    query = request.form["query"]
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM books WHERE nombre LIKE ?", ('%'+query+'%',))
+    libros = cur.fetchall()
+
+    return render_template("dashboard.html", libros=libros, total=len(libros))
 
 @app.route("/logout")
 def logout():
