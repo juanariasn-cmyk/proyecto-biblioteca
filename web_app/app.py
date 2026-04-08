@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, flash
 import sqlite3, os
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = "secret123"
@@ -12,6 +13,7 @@ def init_db():
     conn = db()
     cur = conn.cursor()
 
+    # usuarios
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,6 +23,7 @@ def init_db():
     )
     """)
 
+    # libros
     cur.execute("""
     CREATE TABLE IF NOT EXISTS books (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,26 +32,31 @@ def init_db():
     )
     """)
 
+    # prestamos
     cur.execute("""
     CREATE TABLE IF NOT EXISTS prestamos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         libro_id INTEGER,
-        usuario TEXT
+        usuario TEXT,
+        fecha TEXT,
+        devolucion TEXT
     )
     """)
 
     # admin por defecto
     cur.execute("SELECT * FROM users WHERE user='admin'")
     if not cur.fetchone():
-        cur.execute("INSERT INTO users (user, pass, rol) VALUES (?,?,?)",
-                    ("admin", generate_password_hash("1234"), "admin"))
+        cur.execute(
+            "INSERT INTO users (user, pass, rol) VALUES (?,?,?)",
+            ("admin", generate_password_hash("1234"), "admin")
+        )
 
     conn.commit()
     conn.close()
 
 init_db()
 
-# LOGIN
+# 🔐 LOGIN
 @app.route("/", methods=["GET","POST"])
 def login():
     if request.method == "POST":
@@ -69,7 +77,7 @@ def login():
 
     return render_template("login.html")
 
-# REGISTRO (usuarios normales)
+# 🧾 REGISTRO
 @app.route("/register", methods=["GET","POST"])
 def register():
     if request.method == "POST":
@@ -79,8 +87,10 @@ def register():
         conn = db()
         cur = conn.cursor()
         try:
-            cur.execute("INSERT INTO users (user, pass, rol) VALUES (?,?,?)",
-                        (u,p,"user"))
+            cur.execute(
+                "INSERT INTO users (user, pass, rol) VALUES (?,?,?)",
+                (u, p, "user")
+            )
             conn.commit()
             flash("Usuario creado")
             return redirect("/")
@@ -89,7 +99,7 @@ def register():
 
     return render_template("register.html")
 
-# DASHBOARD
+# 📊 DASHBOARD
 @app.route("/dashboard")
 def dashboard():
     if "user" not in session:
@@ -104,44 +114,21 @@ def dashboard():
     cur.execute("SELECT COUNT(*) FROM books")
     total_libros = cur.fetchone()[0]
 
+    cur.execute("SELECT COUNT(*) FROM prestamos")
+    total_prestamos = cur.fetchone()[0]
+
+    cur.execute("SELECT COUNT(*) FROM prestamos WHERE devolucion < date('now')")
+    atrasados = cur.fetchone()[0]
+
     return render_template("dashboard.html",
-                           libros=libros,
-                           total_libros=total_libros,
-                           rol=session["rol"])
+        libros=libros,
+        total_libros=total_libros,
+        total_prestamos=total_prestamos,
+        atrasados=atrasados,
+        rol=session["rol"]
+    )
 
-# PRESTAR
-@app.route("/prestar/<int:id>")
-def prestar(id):
-    user = session["user"]
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO prestamos (libro_id, usuario) VALUES (?,?)",
-                (id,user))
-    conn.commit()
-
-    flash("Libro prestado")
-    return redirect("/dashboard")
-
-# PANEL ADMIN
-@app.route("/admin")
-def admin():
-    if session.get("rol") != "admin":
-        return redirect("/dashboard")
-
-    conn = db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT prestamos.id, books.nombre, prestamos.usuario
-    FROM prestamos
-    JOIN books ON prestamos.libro_id = books.id
-    """)
-    datos = cur.fetchall()
-
-    return render_template("admin.html", datos=datos)
-
-# AGREGAR LIBRO
+# ➕ AGREGAR LIBRO (ADMIN)
 @app.route("/add", methods=["POST"])
 def add():
     if session.get("rol") != "admin":
@@ -155,14 +142,49 @@ def add():
     cur.execute("INSERT INTO books (nombre, autor) VALUES (?,?)", (nombre, autor))
     conn.commit()
 
+    flash("Libro agregado")
     return redirect("/dashboard")
 
-# LOGOUT
+# 📚 PRESTAR
+@app.route("/prestar/<int:id>")
+def prestar(id):
+    user = session["user"]
+
+    hoy = datetime.now()
+    devolucion = hoy + timedelta(days=7)
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO prestamos (libro_id, usuario, fecha, devolucion)
+        VALUES (?,?,?,?)
+    """, (id, user, hoy.strftime("%Y-%m-%d"), devolucion.strftime("%Y-%m-%d")))
+    conn.commit()
+
+    flash("Libro prestado (7 días)")
+    return redirect("/dashboard")
+
+# ❌ ELIMINAR
+@app.route("/delete/<int:id>")
+def delete(id):
+    if session.get("rol") != "admin":
+        return redirect("/dashboard")
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM books WHERE id=?", (id,))
+    conn.commit()
+
+    flash("Libro eliminado")
+    return redirect("/dashboard")
+
+# 🚪 LOGOUT
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
 
+# 🔥 RENDER
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
