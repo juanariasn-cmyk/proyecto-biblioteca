@@ -11,49 +11,74 @@ body{
     color:white;
 }
 
+/* HEADER */
 .header{
     background:#0f172a;
     padding:15px;
     display:flex;
     justify-content:space-between;
+    align-items:center;
 }
 
+/* GRID LIBROS */
 .grid{
     display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px,1fr));
-    gap:15px;
+    grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
+    gap:20px;
     padding:20px;
 }
 
+/* CARD */
 .card{
     background:#1e293b;
-    border-radius:10px;
-    padding:10px;
-    text-align:center;
+    border-radius:12px;
+    overflow:hidden;
     transition:0.3s;
 }
 .card:hover{
     transform:scale(1.05);
 }
 
-img{
+/* IMAGEN */
+.card img{
     width:100%;
-    height:200px;
+    height:250px;
     object-fit:cover;
-    border-radius:10px;
 }
 
+/* CONTENIDO */
+.card-body{
+    padding:10px;
+    text-align:center;
+}
+
+/* BOTONES */
 button{
     background:#3b82f6;
     border:none;
-    padding:8px;
+    padding:8px 12px;
     color:white;
     border-radius:6px;
     cursor:pointer;
 }
 
+button:hover{
+    background:#2563eb;
+}
+
+/* SECCIONES */
 .section{
     padding:20px;
+}
+
+.loan{
+    background:#1e293b;
+    padding:15px;
+    margin:10px;
+    border-radius:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
 }
 </style>
 
@@ -61,11 +86,13 @@ button{
 
 <body>
 
+<!-- HEADER -->
 <div class="header">
-<h3>👤 {{ session.get('user') }}</h3>
-<a href="/logout" style="color:red;">Salir</a>
+    <h3>👤 {{ session.get('user') }}</h3>
+    <a href="/logout" style="color:red;">Salir</a>
 </div>
 
+<!-- LIBROS -->
 <div class="section">
 <h2>📚 Libros disponibles</h2>
 
@@ -77,16 +104,18 @@ button{
 
 <img src="{{ url_for('static', filename='uploads/' + (l[3] or 'default.png')) }}">
 
+<div class="card-body">
 <h4>{{ l[1] }}</h4>
-<p>{{ l[2] }}</p>
+<p style="color:#94a3b8;">{{ l[2] }}</p>
 
 {% if l[4]==1 %}
 <a href="/prestar/{{ l[0] }}">
-<button>📥 Pedir</button>
+<button>📥 Pedir libro</button>
 </a>
 {% else %}
-<p style="color:red;">No disponible</p>
+<p style="color:red;">❌ No disponible</p>
 {% endif %}
+</div>
 
 </div>
 {% endfor %}
@@ -97,24 +126,34 @@ button{
 {% endif %}
 </div>
 
+<!-- PRESTAMOS -->
 <div class="section">
 <h2>📖 Mis préstamos</h2>
 
-{% for p in prestamos %}
-<div style="margin:10px; background:#1e293b; padding:10px; border-radius:10px;">
+{% if prestamos %}
+    {% for p in prestamos %}
+    <div class="loan">
 
-{{ p[1] }}
+        <div>
+            <b>{{ p[1] }}</b><br>
+            <small style="color:#94a3b8;">Fecha: {{ p[2] }}</small>
+        </div>
 
-{% if p[3]==0 %}
-<a href="/devolver/{{ p[0] }}">
-<button>Devolver</button>
-</a>
+        <div>
+        {% if p[3]==0 %}
+            <a href="/devolver/{{ p[0] }}">
+                <button>Devolver</button>
+            </a>
+        {% else %}
+            <span style="color:lightgreen;">✔ Devuelto</span>
+        {% endif %}
+        </div>
+
+    </div>
+    {% endfor %}
 {% else %}
-✔ Devuelto
+<p>No tienes préstamos</p>
 {% endif %}
-
-</div>
-{% endfor %}
 
 </div>
 
