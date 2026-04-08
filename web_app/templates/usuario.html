@@ -1,1 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Usuario</title>
 
+<style>
+body{
+    margin:0;
+    font-family:Arial;
+    background:#020617;
+    color:white;
+}
+
+.header{
+    background:#0f172a;
+    padding:15px;
+    display:flex;
+    justify-content:space-between;
+}
+
+.section{
+    padding:20px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+    <h3>👤 {{ session.get('user') }}</h3>
+    <a href="/logout" style="color:red;">Salir</a>
+</div>
+
+<div class="section">
+    <h2>Bienvenido</h2>
+    <p>Login exitoso 🔥</p>
+</div>
+
+</body>
+</html>
