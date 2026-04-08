@@ -12,13 +12,17 @@ body{background:#020617;color:white;font-family:Arial}
 
 <div class="container">
 
-<h2>Admin</h2>
+<h2>👑 Panel Admin</h2>
+
+<a href="/dashboard">
+<button>📊 Ver Dashboard</button>
+</a>
 
 <form method="POST" enctype="multipart/form-data">
 <input name="titulo" placeholder="Título" required>
 <input name="autor" placeholder="Autor" required>
 <input type="file" name="imagen">
-<button>Agregar</button>
+<button>Agregar libro</button>
 </form>
 
 {% for l in libros %}
