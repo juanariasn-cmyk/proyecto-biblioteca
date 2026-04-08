@@ -168,7 +168,7 @@ def buscar():
 
     return render_template('usuario.html', libros=libros, prestamos=[])
 
-# ================= DASHBOARD 📊 =================
+# ================= DASHBOARD =================
 @app.route('/dashboard')
 def dashboard():
     if 'user' not in session or session['user'] != 'admin':
@@ -186,18 +186,22 @@ def dashboard():
     cur.execute("SELECT COUNT(*) FROM prestamos WHERE devuelto=0")
     prestados = cur.fetchone()[0]
 
+    cur.execute("SELECT COUNT(*) FROM prestamos WHERE devuelto=1")
+    devueltos = cur.fetchone()[0]
+
     conn.close()
 
     return render_template('dashboard.html',
                            total_libros=total_libros,
                            total_users=total_users,
-                           prestados=prestados)
+                           prestados=prestados,
+                           devueltos=devueltos)
 
 # ================= LOGOUT =================
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/')
-    
+
 if __name__ == '__main__':
     app.run(debug=True)
