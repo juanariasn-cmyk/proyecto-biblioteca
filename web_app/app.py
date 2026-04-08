@@ -13,7 +13,6 @@ def init_db():
     conn = db()
     cur = conn.cursor()
 
-    # usuarios
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,7 +22,6 @@ def init_db():
     )
     """)
 
-    # libros
     cur.execute("""
     CREATE TABLE IF NOT EXISTS books (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,18 +30,18 @@ def init_db():
     )
     """)
 
-    # prestamos
     cur.execute("""
     CREATE TABLE IF NOT EXISTS prestamos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         libro_id INTEGER,
         usuario TEXT,
         fecha TEXT,
-        devolucion TEXT
+        devolucion TEXT,
+        devuelto INTEGER DEFAULT 0
     )
     """)
 
-    # admin por defecto
+    # admin
     cur.execute("SELECT * FROM users WHERE user='admin'")
     if not cur.fetchone():
         cur.execute(
@@ -56,7 +54,7 @@ def init_db():
 
 init_db()
 
-# 🔐 LOGIN
+# LOGIN
 @app.route("/", methods=["GET","POST"])
 def login():
     if request.method == "POST":
@@ -77,7 +75,7 @@ def login():
 
     return render_template("login.html")
 
-# 🧾 REGISTRO
+# REGISTER
 @app.route("/register", methods=["GET","POST"])
 def register():
     if request.method == "POST":
@@ -99,7 +97,7 @@ def register():
 
     return render_template("register.html")
 
-# 📊 DASHBOARD
+# DASHBOARD
 @app.route("/dashboard")
 def dashboard():
     if "user" not in session:
@@ -111,80 +109,86 @@ def dashboard():
     cur.execute("SELECT * FROM books")
     libros = cur.fetchall()
 
-    cur.execute("SELECT COUNT(*) FROM books")
-    total_libros = cur.fetchone()[0]
+    # prestamos activos
+    cur.execute("SELECT libro_id FROM prestamos WHERE devuelto=0")
+    prestados = [x[0] for x in cur.fetchall()]
 
-    cur.execute("SELECT COUNT(*) FROM prestamos")
-    total_prestamos = cur.fetchone()[0]
-
-    cur.execute("SELECT COUNT(*) FROM prestamos WHERE devolucion < date('now')")
+    # atrasos
+    cur.execute("""
+    SELECT COUNT(*) FROM prestamos 
+    WHERE devolucion < date('now') AND devuelto=0
+    """)
     atrasados = cur.fetchone()[0]
 
     return render_template("dashboard.html",
         libros=libros,
-        total_libros=total_libros,
-        total_prestamos=total_prestamos,
+        prestados=prestados,
         atrasados=atrasados,
         rol=session["rol"]
     )
 
-# ➕ AGREGAR LIBRO (ADMIN)
-@app.route("/add", methods=["POST"])
-def add():
-    if session.get("rol") != "admin":
-        return redirect("/dashboard")
-
-    nombre = request.form["nombre"]
-    autor = request.form["autor"]
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO books (nombre, autor) VALUES (?,?)", (nombre, autor))
-    conn.commit()
-
-    flash("Libro agregado")
-    return redirect("/dashboard")
-
-# 📚 PRESTAR
+# PRESTAR
 @app.route("/prestar/<int:id>")
 def prestar(id):
     user = session["user"]
 
+    conn = db()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM prestamos WHERE libro_id=? AND devuelto=0", (id,))
+    if cur.fetchone():
+        flash("Libro no disponible")
+        return redirect("/dashboard")
+
     hoy = datetime.now()
     devolucion = hoy + timedelta(days=7)
 
-    conn = db()
-    cur = conn.cursor()
     cur.execute("""
-        INSERT INTO prestamos (libro_id, usuario, fecha, devolucion)
-        VALUES (?,?,?,?)
+    INSERT INTO prestamos (libro_id, usuario, fecha, devolucion)
+    VALUES (?,?,?,?)
     """, (id, user, hoy.strftime("%Y-%m-%d"), devolucion.strftime("%Y-%m-%d")))
-    conn.commit()
 
-    flash("Libro prestado (7 días)")
+    conn.commit()
+    flash("Libro prestado")
     return redirect("/dashboard")
 
-# ❌ ELIMINAR
-@app.route("/delete/<int:id>")
-def delete(id):
-    if session.get("rol") != "admin":
-        return redirect("/dashboard")
+# DEVOLVER
+@app.route("/devolver/<int:id>")
+def devolver(id):
+    conn = db()
+    cur = conn.cursor()
+
+    cur.execute("UPDATE prestamos SET devuelto=1 WHERE libro_id=? AND devuelto=0", (id,))
+    conn.commit()
+
+    flash("Libro devuelto")
+    return redirect("/dashboard")
+
+# HISTORIAL
+@app.route("/historial")
+def historial():
+    user = session["user"]
 
     conn = db()
     cur = conn.cursor()
-    cur.execute("DELETE FROM books WHERE id=?", (id,))
-    conn.commit()
 
-    flash("Libro eliminado")
-    return redirect("/dashboard")
+    cur.execute("""
+    SELECT books.nombre, fecha, devolucion, devuelto
+    FROM prestamos
+    JOIN books ON prestamos.libro_id = books.id
+    WHERE usuario=?
+    """, (user,))
 
-# 🚪 LOGOUT
+    datos = cur.fetchall()
+
+    return render_template("historial.html", datos=datos)
+
+# LOGOUT
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
 
-# 🔥 RENDER
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
