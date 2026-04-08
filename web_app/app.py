@@ -8,21 +8,21 @@ app.secret_key = "secret123"
 def db():
     return sqlite3.connect("db.db", check_same_thread=False)
 
-# 🔥 CREAR DB AUTOMÁTICAMENTE
 def init_db():
     conn = db()
     cur = conn.cursor()
+
     cur.execute("CREATE TABLE IF NOT EXISTS users (user TEXT, pass TEXT)")
-    
-    # Usuario por defecto
+    cur.execute("CREATE TABLE IF NOT EXISTS books (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, autor TEXT)")
+
+    # usuario default
     cur.execute("SELECT * FROM users WHERE user='admin'")
     if not cur.fetchone():
         cur.execute("INSERT INTO users VALUES ('admin', '1234')")
-    
+
     conn.commit()
     conn.close()
 
-# Ejecutar al iniciar
 init_db()
 
 @app.route("/", methods=["GET","POST"])
@@ -35,14 +35,42 @@ def login():
         cur.execute("SELECT * FROM users WHERE user=? AND pass=?", (u,p))
         if cur.fetchone():
             session["user"] = u
-            return redirect("/home")
+            return redirect("/dashboard")
     return render_template("login.html")
 
-@app.route("/home")
-def home():
-    return render_template("home.html")
+@app.route("/dashboard")
+def dashboard():
+    if "user" not in session:
+        return redirect("/")
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM books")
+    libros = cur.fetchall()
+    return render_template("dashboard.html", libros=libros)
 
-# 🔥 CONFIG PARA RENDER
+@app.route("/add", methods=["POST"])
+def add():
+    nombre = request.form["nombre"]
+    autor = request.form["autor"]
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO books (nombre, autor) VALUES (?,?)", (nombre, autor))
+    conn.commit()
+    return redirect("/dashboard")
+
+@app.route("/delete/<int:id>")
+def delete(id):
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM books WHERE id=?", (id,))
+    conn.commit()
+    return redirect("/dashboard")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/")
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
