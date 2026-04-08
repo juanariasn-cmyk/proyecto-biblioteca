@@ -2,9 +2,14 @@ from flask import Flask, render_template, request, redirect, session, flash
 import sqlite3, os
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = "secret123"
+
+UPLOAD_FOLDER = "static/uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 def db():
     return sqlite3.connect("db.db", check_same_thread=False)
@@ -113,35 +118,31 @@ def dashboard():
     cur.execute("SELECT libro_id FROM prestamos WHERE devuelto=0")
     prestados = [x[0] for x in cur.fetchall()]
 
-    cur.execute("""
-    SELECT COUNT(*) FROM prestamos 
-    WHERE devolucion < date('now') AND devuelto=0
-    """)
-    atrasados = cur.fetchone()[0]
-
     return render_template("dashboard.html",
         libros=libros,
         prestados=prestados,
-        atrasados=atrasados,
         rol=session.get("rol")
     )
 
-# AGREGAR LIBRO
+# AGREGAR LIBRO (CON ARCHIVO)
 @app.route("/add", methods=["POST"])
 def add():
     if session.get("rol") != "admin":
-        flash("❌ Solo admin")
         return redirect("/dashboard")
 
     nombre = request.form["nombre"]
     autor = request.form["autor"]
-    imagen = request.form["imagen"]
+
+    file = request.files["imagen"]
+    filename = secure_filename(file.filename)
+    path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    file.save(path)
 
     conn = db()
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO books (nombre, autor, imagen) VALUES (?,?,?)",
-        (nombre, autor, imagen)
+        (nombre, autor, path)
     )
     conn.commit()
 
@@ -156,7 +157,7 @@ def prestar(id):
 
     cur.execute("SELECT * FROM prestamos WHERE libro_id=? AND devuelto=0", (id,))
     if cur.fetchone():
-        flash("Libro no disponible")
+        flash("Libro ocupado")
         return redirect("/dashboard")
 
     hoy = datetime.now()
@@ -176,35 +177,10 @@ def prestar(id):
 def devolver(id):
     conn = db()
     cur = conn.cursor()
-
     cur.execute("UPDATE prestamos SET devuelto=1 WHERE libro_id=? AND devuelto=0", (id,))
     conn.commit()
 
     flash("Libro devuelto")
-    return redirect("/dashboard")
-
-# ADMIN
-@app.route("/admin")
-def admin():
-    if session.get("rol") != "admin":
-        return redirect("/dashboard")
-
-    conn = db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT prestamos.id, books.nombre, prestamos.usuario, prestamos.devuelto
-    FROM prestamos
-    JOIN books ON prestamos.libro_id = books.id
-    """)
-    datos = cur.fetchall()
-
-    return render_template("admin.html", datos=datos)
-
-# TEMA
-@app.route("/tema/<modo>")
-def tema(modo):
-    session["tema"] = modo
     return redirect("/dashboard")
 
 # LOGOUT
