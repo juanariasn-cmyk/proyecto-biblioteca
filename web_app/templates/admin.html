@@ -3,94 +3,30 @@
 <head>
 <title>Admin</title>
 <style>
-body{
-    background:#0f172a;
-    color:white;
-    font-family:Arial;
-}
-.container{
-    width:90%;
-    margin:auto;
-}
-.card{
-    background:#1e293b;
-    padding:15px;
-    margin:10px;
-    border-radius:10px;
-}
-input,button{
-    padding:8px;
-    margin:5px;
-}
-button{
-    background:#22c55e;
-    border:none;
-    color:white;
-    cursor:pointer;
-}
+body{background:#020617;color:white;font-family:Arial}
+.section{padding:20px}
+input,button{padding:10px;margin:5px}
 </style>
 </head>
-
 <body>
 
-<div class="container">
+<div class="section">
+<h2>👑 Panel Admin</h2>
 
-<h1>👑 ADMIN</h1>
-<a href="/logout">Salir</a>
-
-<div class="card">
-<h3>➕ Agregar libro</h3>
-
-<form action="/add_book" method="POST" enctype="multipart/form-data">
+<form method="POST">
 <input name="titulo" placeholder="Título" required>
 <input name="autor" placeholder="Autor" required>
-<input type="file" name="imagen">
-<button>Agregar</button>
+<button>Agregar libro</button>
 </form>
-</div>
 
-<div class="card">
 <h3>📚 Libros</h3>
-
+<ul>
 {% for l in libros %}
-<div style="margin:10px; border-bottom:1px solid gray;">
-<img src="{{ url_for('static', filename='uploads/' + (l[3] or 'default.png')) }}" width="80">
-<b>{{ l[1] }}</b> - {{ l[2] }}
-
-{% if l[4]==1 %}
-<span style="color:lightgreen;">Disponible</span>
-{% else %}
-<span style="color:red;">Prestado</span>
-{% endif %}
-</div>
+<li>{{ l[1] }} - {{ l[2] }}</li>
 {% endfor %}
+</ul>
 
-</div>
-
-<div class="card">
-<h3>📖 Préstamos</h3>
-
-{% for p in prestamos %}
-<div>
-{{ p[1] }} → {{ p[2] }}
-
-{% if p[4]==0 %}
-<a href="/devolver/{{ p[0] }}">Devolver</a>
-{% else %}
-✔
-{% endif %}
-</div>
-{% endfor %}
-</div>
-
-<div class="card">
-<h3>👤 Usuarios</h3>
-
-{% for u in users %}
-<div>{{ u[1] }} - {{ u[3] }}</div>
-{% endfor %}
-</div>
-
+<a href="/logout">Salir</a>
 </div>
 
 </body>
