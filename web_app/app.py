@@ -6,17 +6,35 @@ app = Flask(__name__)
 app.secret_key = "secret123"
 
 def db():
-    return sqlite3.connect("db.db")
+    return sqlite3.connect("db.db", check_same_thread=False)
+
+# 🔥 CREAR DB AUTOMÁTICAMENTE
+def init_db():
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS users (user TEXT, pass TEXT)")
+    
+    # Usuario por defecto
+    cur.execute("SELECT * FROM users WHERE user='admin'")
+    if not cur.fetchone():
+        cur.execute("INSERT INTO users VALUES ('admin', '1234')")
+    
+    conn.commit()
+    conn.close()
+
+# Ejecutar al iniciar
+init_db()
 
 @app.route("/", methods=["GET","POST"])
 def login():
     if request.method == "POST":
         u = request.form["user"]
         p = request.form["password"]
-        conn = db(); cur = conn.cursor()
+        conn = db()
+        cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE user=? AND pass=?", (u,p))
         if cur.fetchone():
-            session["user"]=u
+            session["user"] = u
             return redirect("/home")
     return render_template("login.html")
 
@@ -24,7 +42,7 @@ def login():
 def home():
     return render_template("home.html")
 
-# 🔥 IMPORTANTE PARA RENDER
+# 🔥 CONFIG PARA RENDER
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
