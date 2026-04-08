@@ -31,6 +31,12 @@ def init_db():
         user TEXT, libro_id INTEGER,
         fecha TEXT, devuelto INTEGER DEFAULT 0)""")
 
+    # 🔥 CREAR ADMIN AUTOMÁTICO
+    cur.execute("SELECT * FROM users WHERE user='admin'")
+    if not cur.fetchone():
+        cur.execute("INSERT INTO users (user, pass, rol) VALUES (?,?,?)",
+                    ("admin", "1234", "admin"))
+
     conn.commit()
     conn.close()
 
@@ -40,6 +46,7 @@ init_db()
 @app.route("/", methods=["GET","POST"])
 def login():
     error = None
+
     if request.method == "POST":
         u = request.form["user"]
         p = request.form["password"]
@@ -54,7 +61,10 @@ def login():
             session["user"] = user[1]
             session["rol"] = user[3]
 
-            return redirect("/admin" if user[3]=="admin" else "/dashboard")
+            if user[3] == "admin":
+                return redirect("/admin")
+            else:
+                return redirect("/dashboard")
         else:
             error = "❌ Usuario o contraseña incorrectos"
 
@@ -130,9 +140,12 @@ def admin():
     conn.close()
 
     return render_template("admin.html",
-        libros=libros, users=users, prestamos=prestamos)
+        libros=libros,
+        users=users,
+        prestamos=prestamos
+    )
 
-# ================= ADD =================
+# ================= ADD BOOK =================
 @app.route("/add_book", methods=["POST"])
 def add_book():
     titulo = request.form["titulo"]
@@ -162,6 +175,7 @@ def prestar(id):
 
     conn.commit()
     conn.close()
+
     return redirect("/dashboard")
 
 # ================= DEVOLVER =================
@@ -201,31 +215,12 @@ def export():
     return Response(generate(), mimetype="text/csv",
                     headers={"Content-Disposition":"attachment;filename=reporte.csv"})
 
-# ================= API =================
-@app.route("/api/libros")
-def api_libros():
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM libros")
-    libros = cur.fetchall()
-
-    lista = []
-    for l in libros:
-        lista.append({
-            "id": l[0],
-            "titulo": l[1],
-            "autor": l[2],
-            "imagen": l[3],
-            "disponible": l[4]
-        })
-
-    return {"libros": lista}
-
 # ================= LOGOUT =================
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
 
+# ================= RUN =================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
