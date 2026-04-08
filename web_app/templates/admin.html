@@ -1,23 +1,16 @@
-<h1>👑 ADMIN</h1>
+<h1>👑 ADMIN EMPRESA</h1>
 
-<form method="POST" action="/add_book" enctype="multipart/form-data">
-<input name="titulo" placeholder="Título">
-<input name="autor" placeholder="Autor">
-<input type="file" name="imagen">
-<button>Agregar</button>
-</form>
+<a href="/export">📥 Descargar reporte CSV</a>
 
-<h2>📚 Libros</h2>
-{% for l in libros %}
-<div>
-<img src="{{ url_for('static', filename='uploads/' + l[3]) }}" width="80">
-{{ l[1] }}
+<h2>📖 Préstamos</h2>
+
+{% for p in prestamos %}
+<div style="border:1px solid #ccc; margin:10px; padding:10px;">
+{{ p[1] }} - {{ p[2] }}
+
+{% if p[5] > 5 and p[4]==0 %}
+<p style="color:red;">💸 Multa: ${{ (p[5]-5)*1000 }}</p>
+{% endif %}
+
 </div>
 {% endfor %}
-
-<h2>👤 Usuarios</h2>
-{% for u in users %}
-<div>{{ u[1] }} - {{ u[3] }}</div>
-{% endfor %}
-
-<a href="/logout">Salir</a>
