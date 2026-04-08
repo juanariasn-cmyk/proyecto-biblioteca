@@ -1,34 +1,52 @@
-<h2>👤 {{ session.user }}</h2>
+<!DOCTYPE html>
+<html>
+<head>
+<title>Usuario</title>
+</head>
 
+<body>
+
+<h2>👤 {{ session.get('user') }}</h2>
 <a href="/logout">Salir</a>
 
 <h3>📚 Libros</h3>
 
-{% for l in libros %}
-<div style="border:1px solid #ccc; margin:10px; padding:10px;">
-<img src="{{ url_for('static', filename='uploads/' + l[3]) }}" width="100">
+{% if libros %}
+    {% for l in libros %}
+    <div style="border:1px solid #ccc; margin:10px; padding:10px;">
+        <img src="{{ url_for('static', filename='uploads/' + (l[3] or 'default.png')) }}" width="100">
 
-<b>{{ l[1] }}</b><br>
-{{ l[2] }}
+        <b>{{ l[1] }}</b><br>
+        {{ l[2] }}
 
-{% if l[4] == 1 %}
-<a href="/prestar/{{ l[0] }}">📥 Pedir</a>
+        {% if l[4] == 1 %}
+            <a href="/prestar/{{ l[0] }}">📥 Pedir</a>
+        {% else %}
+            ❌ No disponible
+        {% endif %}
+    </div>
+    {% endfor %}
 {% else %}
-❌ No disponible
+<p>No hay libros aún</p>
 {% endif %}
-</div>
-{% endfor %}
 
 <h3>📖 Mis préstamos</h3>
 
-{% for p in prestamos %}
-<div>
-{{ p[1] }}
+{% if prestamos %}
+    {% for p in prestamos %}
+    <div>
+        {{ p[1] }}
 
-{% if p[3]==0 %}
-<a href="/devolver/{{ p[0] }}">🔁 Devolver</a>
+        {% if p[3]==0 %}
+            <a href="/devolver/{{ p[0] }}">🔁 Devolver</a>
+        {% else %}
+            ✅ Devuelto
+        {% endif %}
+    </div>
+    {% endfor %}
 {% else %}
-✅ Devuelto
+<p>No tienes préstamos</p>
 {% endif %}
-</div>
-{% endfor %}
+
+</body>
+</html>
