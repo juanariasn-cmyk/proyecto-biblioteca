@@ -1,112 +1,170 @@
-from flask import Flask, render_template, request, redirect, session
+from flask import Flask, render_template, request, redirect, session, url_for
 import sqlite3
-from datetime import datetime
+import os
 
 app = Flask(__name__)
-app.secret_key = "final123"
+app.secret_key = "super_secret_key_123"
 
-# ================= DB =================
+# ======================
+# BASE DE DATOS
+# ======================
 def db():
     return sqlite3.connect("db.db")
 
+# ======================
+# CREAR TABLAS
+# ======================
 def init_db():
     conn = db()
     cur = conn.cursor()
 
-    cur.execute("""CREATE TABLE IF NOT EXISTS users(
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user TEXT,
+        user TEXT UNIQUE,
         pass TEXT,
-        rol TEXT)""")
+        role TEXT
+    )
+    """)
 
-    cur.execute("""CREATE TABLE IF NOT EXISTS libros(
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS libros (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         titulo TEXT,
         autor TEXT,
         imagen TEXT,
-        disponible INTEGER DEFAULT 1)""")
+        disponible INTEGER DEFAULT 1
+    )
+    """)
 
-    cur.execute("""CREATE TABLE IF NOT EXISTS prestamos(
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS prestamos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        usuario TEXT,
-        libro_id INTEGER,
-        fecha TEXT)""")
+        user TEXT,
+        libro_id INTEGER
+    )
+    """)
 
-    # ADMIN
+    # CREAR ADMIN SI NO EXISTE
     cur.execute("SELECT * FROM users WHERE user='admin'")
     if not cur.fetchone():
-        cur.execute("INSERT INTO users (user, pass, rol) VALUES ('admin','1234','admin')")
+        cur.execute("INSERT INTO users (user, pass, role) VALUES (?, ?, ?)", 
+                    ("admin", "admin", "admin"))
 
     conn.commit()
     conn.close()
 
 init_db()
 
-# ================= LOGIN =================
-@app.route("/", methods=["GET","POST"])
+# ======================
+# LOGIN
+# ======================
+@app.route("/", methods=["GET", "POST"])
 def login():
-    error = None
-
     if request.method == "POST":
         u = request.form["user"]
         p = request.form["password"]
 
         conn = db()
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE user=? AND pass=?", (u,p))
+
+        cur.execute("SELECT user, role FROM users WHERE user=? AND pass=?", (u, p))
         user = cur.fetchone()
-        conn.close()
 
         if user:
-            session.clear()
-            session["user"] = user[1]
-            session["rol"] = user[3]
+            session["user"] = user[0]
+            session["role"] = user[1]
 
-            if user[3] == "admin":
+            if user[1] == "admin":
                 return redirect("/admin")
             else:
-                return redirect("/dashboard")
+                return redirect("/usuario")
         else:
-            error = "❌ Usuario o contraseña incorrectos"
+            return render_template("login.html", error="Usuario o contraseña incorrectos")
 
-    return render_template("login.html", error=error)
+    return render_template("login.html")
 
-# ================= PROTECCIÓN GLOBAL =================
-@app.before_request
-def proteger_rutas():
-    rutas_publicas = ["/"]
 
-    if request.path not in rutas_publicas:
-        if "user" not in session:
-            return redirect("/")
+# ======================
+# REGISTRO
+# ======================
+@app.route("/register", methods=["POST"])
+def register():
+    u = request.form["user"]
+    p = request.form["password"]
 
-# ================= DASHBOARD =================
-@app.route("/dashboard")
-def dashboard():
     conn = db()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM libros")
+    try:
+        cur.execute("INSERT INTO users (user, pass, role) VALUES (?, ?, ?)", 
+                    (u, p, "user"))
+        conn.commit()
+    except:
+        return "Usuario ya existe"
+
+    return redirect("/")
+
+
+# ======================
+# USUARIO
+# ======================
+@app.route("/usuario")
+def usuario():
+    if "user" not in session:
+        return redirect("/")
+
+    conn = db()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM libros WHERE disponible=1")
     libros = cur.fetchall()
 
     cur.execute("""
-        SELECT libros.titulo, prestamos.fecha
-        FROM prestamos
-        JOIN libros ON libros.id = prestamos.libro_id
-        WHERE prestamos.usuario=?
+        SELECT libros.titulo, libros.imagen 
+        FROM prestamos 
+        JOIN libros ON prestamos.libro_id = libros.id
+        WHERE prestamos.user=?
     """, (session["user"],))
-
     prestamos = cur.fetchall()
 
-    conn.close()
+    return render_template("usuario.html", 
+                           user=session["user"], 
+                           libros=libros, 
+                           prestamos=prestamos)
 
-    return render_template("dashboard.html", libros=libros, prestamos=prestamos)
 
-# ================= ADMIN =================
+# ======================
+# PEDIR LIBRO
+# ======================
+@app.route("/prestar/<int:id>")
+def prestar(id):
+    if "user" not in session:
+        return redirect("/")
+
+    conn = db()
+    cur = conn.cursor()
+
+    # verificar si ya está prestado
+    cur.execute("SELECT disponible FROM libros WHERE id=?", (id,))
+    disponible = cur.fetchone()
+
+    if disponible and disponible[0] == 1:
+        cur.execute("INSERT INTO prestamos (user, libro_id) VALUES (?, ?)", 
+                    (session["user"], id))
+        cur.execute("UPDATE libros SET disponible=0 WHERE id=?", (id,))
+        conn.commit()
+
+    return redirect("/usuario")
+
+
+# ======================
+# ADMIN
+# ======================
 @app.route("/admin")
 def admin():
-    if session.get("rol") != "admin":
-        return redirect("/dashboard")
+    if "user" not in session or session["role"] != "admin":
+        return redirect("/")
 
     conn = db()
     cur = conn.cursor()
@@ -118,74 +176,52 @@ def admin():
     users = cur.fetchall()
 
     cur.execute("""
-        SELECT prestamos.id, prestamos.usuario, libros.titulo, prestamos.fecha
-        FROM prestamos
-        JOIN libros ON libros.id = prestamos.libro_id
+        SELECT prestamos.user, libros.titulo 
+        FROM prestamos 
+        JOIN libros ON prestamos.libro_id = libros.id
     """)
     prestamos = cur.fetchall()
 
-    conn.close()
+    return render_template("admin.html", 
+                           libros=libros, 
+                           users=users, 
+                           prestamos=prestamos)
 
-    return render_template("admin.html", libros=libros, users=users, prestamos=prestamos)
 
-# ================= ADD BOOK =================
-@app.route("/add_book", methods=["POST"])
-def add_book():
+# ======================
+# AGREGAR LIBRO
+# ======================
+@app.route("/add_libro", methods=["POST"])
+def add_libro():
+    if session.get("role") != "admin":
+        return redirect("/")
+
     titulo = request.form["titulo"]
     autor = request.form["autor"]
     imagen = request.form["imagen"]
 
     conn = db()
     cur = conn.cursor()
-    cur.execute("INSERT INTO libros (titulo, autor, imagen) VALUES (?,?,?)",
+
+    cur.execute("INSERT INTO libros (titulo, autor, imagen) VALUES (?, ?, ?)", 
                 (titulo, autor, imagen))
     conn.commit()
-    conn.close()
 
     return redirect("/admin")
 
-# ================= PRESTAR =================
-@app.route("/prestar/<int:id>", methods=["POST"])
-def prestar(id):
-    conn = db()
-    cur = conn.cursor()
 
-    cur.execute("SELECT disponible FROM libros WHERE id=?", (id,))
-    libro = cur.fetchone()
-
-    if libro and libro[0] == 1:
-        fecha = datetime.now().strftime("%Y-%m-%d")
-
-        cur.execute("INSERT INTO prestamos (usuario, libro_id, fecha) VALUES (?,?,?)",
-                    (session["user"], id, fecha))
-
-        cur.execute("UPDATE libros SET disponible=0 WHERE id=?", (id,))
-        conn.commit()
-
-    conn.close()
-    return redirect("/dashboard")
-
-# ================= DEVOLVER =================
-@app.route("/devolver/<int:id>")
-def devolver(id):
-    conn = db()
-    cur = conn.cursor()
-
-    cur.execute("DELETE FROM prestamos WHERE libro_id=? AND usuario=?",
-                (id, session["user"]))
-
-    cur.execute("UPDATE libros SET disponible=1 WHERE id=?", (id,))
-    conn.commit()
-    conn.close()
-
-    return redirect("/dashboard")
-
-# ================= LOGOUT =================
+# ======================
+# LOGOUT
+# ======================
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
 
-# ================= RUN =================
+
+# ======================
+# RUN
+# ======================
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
