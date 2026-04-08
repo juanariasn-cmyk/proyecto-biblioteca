@@ -3,7 +3,7 @@ import sqlite3, os
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = "pro123"
+app.secret_key = "final123"
 
 UPLOAD_FOLDER = "static/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -31,7 +31,7 @@ def init_db():
         user TEXT, libro_id INTEGER,
         fecha TEXT, devuelto INTEGER DEFAULT 0)""")
 
-    # 🔥 ADMIN
+    # admin automático
     cur.execute("SELECT * FROM users WHERE user='admin'")
     if not cur.fetchone():
         cur.execute("INSERT INTO users (user, pass, rol) VALUES (?,?,?)",
@@ -60,9 +60,10 @@ def login():
         if user:
             session["user"] = user[1]
             session["rol"] = user[3]
+
             return redirect("/admin" if user[3]=="admin" else "/dashboard")
         else:
-            error = "❌ Datos incorrectos"
+            error = "❌ Usuario o contraseña incorrectos"
 
     return render_template("login.html", error=error)
 
@@ -93,7 +94,7 @@ def dashboard():
     cur = conn.cursor()
 
     cur.execute("SELECT * FROM libros")
-    libros = cur.fetchall()
+    libros = cur.fetchall() or []
 
     cur.execute("""
     SELECT prestamos.id, libros.titulo, prestamos.fecha, prestamos.devuelto
@@ -102,7 +103,7 @@ def dashboard():
     WHERE prestamos.user=?
     """, (session["user"],))
 
-    prestamos = cur.fetchall()
+    prestamos = cur.fetchall() or []
 
     conn.close()
 
@@ -118,10 +119,10 @@ def admin():
     cur = conn.cursor()
 
     cur.execute("SELECT * FROM libros")
-    libros = cur.fetchall()
+    libros = cur.fetchall() or []
 
     cur.execute("SELECT * FROM users")
-    users = cur.fetchall()
+    users = cur.fetchall() or []
 
     cur.execute("""
     SELECT prestamos.id, users.user, libros.titulo, prestamos.fecha, prestamos.devuelto
@@ -129,7 +130,7 @@ def admin():
     JOIN libros ON libros.id = prestamos.libro_id
     JOIN users ON users.user = prestamos.user
     """)
-    prestamos = cur.fetchall()
+    prestamos = cur.fetchall() or []
 
     conn.close()
 
@@ -146,8 +147,11 @@ def add_book():
     autor = request.form["autor"]
     file = request.files["imagen"]
 
-    filename = file.filename
-    file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+    if file:
+        filename = file.filename
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+    else:
+        filename = "default.png"
 
     conn = db()
     cur = conn.cursor()
@@ -202,6 +206,5 @@ def logout():
     session.clear()
     return redirect("/")
 
-# ================= RUN =================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
