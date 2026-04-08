@@ -1,108 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Biblioteca PRO</title>
+<title>Biblioteca</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
-body {
-    background: #0b0b0b;
-    color: white;
-    font-family: Arial, sans-serif;
-}
-
-.navbar {
-    background: #111;
-}
-
-.card {
-    background: #181818;
-    border-radius: 12px;
-    transition: 0.3s;
-}
-
-.card:hover {
-    transform: scale(1.05);
-}
-
-.book-img {
-    width: 80px;
-    margin-bottom: 10px;
-}
-
-.btn {
-    border-radius: 10px;
-}
+body { background:#0b0b0b; color:white; }
+.card { background:#181818; border-radius:12px; }
 </style>
 </head>
 
 <body>
 
-<!-- NAVBAR -->
-<nav class="navbar navbar-dark px-4">
-    <span class="navbar-brand">🎬 Biblioteca PRO</span>
-
-    <div>
-        <span class="me-3">{{ session['user'] }} ({{ rol }})</span>
-        <a href="/historial" class="btn btn-info btn-sm">Historial</a>
-        <a href="/logout" class="btn btn-danger btn-sm">Salir</a>
-    </div>
+<nav class="navbar navbar-dark bg-dark px-4">
+<span>📚 Biblioteca</span>
+<div>
+<span>{{ session['user'] }} ({{ rol }})</span>
+<a href="/logout" class="btn btn-danger btn-sm">Salir</a>
+</div>
 </nav>
 
 <div class="container mt-4">
 
-<!-- ALERTA ATRASOS -->
-{% if atrasados > 0 %}
-<div class="alert alert-danger text-center">
-⚠️ Tienes libros atrasados
-</div>
+<!-- FORM ADMIN -->
+{% if rol == "admin" %}
+<form action="/add" method="POST" class="mb-4">
+<input name="nombre" placeholder="Nombre" class="form-control mb-2" required>
+<input name="autor" placeholder="Autor" class="form-control mb-2" required>
+<input name="imagen" placeholder="URL imagen" class="form-control mb-2" required>
+<button class="btn btn-success w-100">Agregar libro</button>
+</form>
 {% endif %}
 
-<!-- MENSAJES -->
-{% with messages = get_flashed_messages() %}
-{% if messages %}
-<div class="alert alert-warning text-center">
-{{ messages[0] }}
-</div>
-{% endif %}
-{% endwith %}
-
-<!-- LIBROS -->
 <div class="row">
 
 {% for libro in libros %}
-<div class="col-md-3 col-sm-6 mb-4">
+<div class="col-md-3 mb-4">
+<div class="card p-2 text-center">
 
-<div class="card text-center p-3">
-
-<img class="book-img" src="https://cdn-icons-png.flaticon.com/512/29/29302.png">
+<img src="{{ libro[3] }}" style="width:100%; height:150px; object-fit:cover">
 
 <h5>{{ libro[1] }}</h5>
-<p class="text-muted">{{ libro[2] }}</p>
 
-<!-- ESTADO -->
-{% if libro[0] in prestados %}
-<span class="badge bg-danger mb-2">Prestado</span>
-{% else %}
-<span class="badge bg-success mb-2">Disponible</span>
-{% endif %}
-
-<!-- BOTONES -->
 {% if libro[0] in prestados %}
 <a href="/devolver/{{ libro[0] }}" class="btn btn-success btn-sm">Devolver</a>
 {% else %}
 <a href="/prestar/{{ libro[0] }}" class="btn btn-warning btn-sm">Prestar</a>
 {% endif %}
 
-<!-- SOLO ADMIN -->
-{% if rol == "admin" %}
-<a href="/delete/{{ libro[0] }}" class="btn btn-danger btn-sm mt-2">Eliminar</a>
-{% endif %}
-
 </div>
-
 </div>
 {% endfor %}
 
