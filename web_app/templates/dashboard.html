@@ -1,93 +1,75 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<title>Usuario</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
-body {
-    background: #111;
-    color: white;
-    font-family: Arial;
-}
-
-.scroll {
-    display: flex;
-    overflow-x: auto;
-}
-
-.card {
-    min-width: 180px;
-    margin: 10px;
-    background: #222;
-    padding: 10px;
-    border-radius: 10px;
-}
-img { width:100%; border-radius:10px; }
+body { background:#0b0b0b; color:white; }
+.card { background:#181818; border-radius:12px; }
+img { width:100%; height:150px; object-fit:cover; }
 </style>
 </head>
 
 <body>
 
-<h1>🎬 Bienvenido {{ session.user }}</h1>
+<div class="container mt-4">
 
-<h2>🔥 Recomendados</h2>
-<div class="scroll">
-{% for l in recomendados %}
-<div class="card">
-<img src="{{ url_for('static', filename='uploads/' + l[3]) }}">
-<p>{{ l[1] }}</p>
-<a href="/prestar/{{ l[0] }}">📥</a>
-</div>
-{% endfor %}
-</div>
+<h2>👤 Bienvenido {{ session.user }}</h2>
 
-<h2>📚 Todos</h2>
-<div class="scroll">
+<a href="/logout" class="btn btn-danger mb-3">Salir</a>
+
+<hr>
+
+<h4>📚 Libros disponibles</h4>
+
+<div class="row">
 {% for l in libros %}
-<div class="card">
-<img src="{{ url_for('static', filename='uploads/' + l[3]) }}">
-<p>{{ l[1] }}</p>
+<div class="col-md-3 mb-3">
 
-{% if l[4]==1 %}
-<a href="/prestar/{{ l[0] }}">📥</a>
+<div class="card p-2 text-center">
+
+<img src="{{ url_for('static', filename='uploads/' + l[3]) }}">
+
+<h6>{{ l[1] }}</h6>
+<p>{{ l[2] }}</p>
+
+{% if l[4] == 1 %}
+<a href="/prestar/{{ l[0] }}" class="btn btn-warning btn-sm">📥 Pedir</a>
 {% else %}
-❌
+<span class="badge bg-danger">No disponible</span>
 {% endif %}
+
+</div>
+
 </div>
 {% endfor %}
 </div>
 
-<h2>📊 Estadísticas</h2>
-<canvas id="grafica"></canvas>
+<hr>
 
-<script>
-new Chart(document.getElementById("grafica"), {
-    type: "bar",
-    data: {
-        labels: ["Prestados", "Devueltos"],
-        datasets: [{
-            data: [
-                {{ prestamos|selectattr(3,'equalto',0)|list|length }},
-                {{ prestamos|selectattr(3,'equalto',1)|list|length }}
-            ]
-        }]
-    }
-});
-</script>
+<h4>📖 Mis préstamos</h4>
 
-<h2>💸 Multas</h2>
 {% for p in prestamos %}
-<div>
-{{ p[1] }}
+<div class="card p-2 mb-2">
+
+<b>{{ p[1] }}</b><br>
+Fecha: {{ p[2] }}
+
+{% if p[3] == 0 %}
+<a href="/devolver/{{ p[0] }}" class="btn btn-success btn-sm mt-2">🔁 Devolver</a>
+{% else %}
+<span class="badge bg-success">Devuelto</span>
+{% endif %}
 
 {% if p[4] > 5 and p[3]==0 %}
-⚠ ${{ (p[4]-5)*1000 }}
+<p style="color:red;">💸 Multa: ${{ (p[4]-5)*1000 }}</p>
 {% endif %}
+
 </div>
 {% endfor %}
 
-<a href="/logout">Salir</a>
+</div>
 
 </body>
 </html>
