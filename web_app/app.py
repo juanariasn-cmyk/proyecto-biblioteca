@@ -1,12 +1,13 @@
 from flask import Flask, render_template, request, redirect, session
-import sqlite3
+import sqlite3, os
 
 app = Flask(__name__)
-app.secret_key = "ultra_pro_key"
+app.secret_key = "hacker_mode"
 
-# =========================
-# DB
-# =========================
+UPLOAD_FOLDER = 'static/uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# ================= DB =================
 def db():
     return sqlite3.connect('db.db')
 
@@ -42,7 +43,7 @@ def crear_db():
     )
     """)
 
-    # ADMIN
+    # ADMIN AUTO
     cur.execute("SELECT * FROM users WHERE usuario='admin'")
     if not cur.fetchone():
         cur.execute("INSERT INTO users(usuario,password) VALUES('admin','123')")
@@ -52,14 +53,12 @@ def crear_db():
 
 crear_db()
 
-# =========================
-# LOGIN
-# =========================
+# ================= LOGIN =================
 @app.route('/', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
-        u = request.form.get('usuario')
-        p = request.form.get('password')
+        u = request.form['usuario']
+        p = request.form['password']
 
         conn = db()
         cur = conn.cursor()
@@ -71,21 +70,16 @@ def login():
             session['user'] = u
             return redirect('/admin' if u == 'admin' else '/usuario')
 
-        return render_template('login.html', error="❌ Usuario o contraseña incorrectos")
+        return render_template('login.html', error="Datos incorrectos")
 
     return render_template('login.html')
 
-# =========================
-# REGISTRO (ARREGLADO)
-# =========================
+# ================= REGISTRO =================
 @app.route('/registro', methods=['GET','POST'])
 def registro():
     if request.method == 'POST':
-        u = request.form.get('usuario')
-        p = request.form.get('password')
-
-        if not u or not p:
-            return render_template('register.html', error="Completa todos los campos")
+        u = request.form['usuario']
+        p = request.form['password']
 
         conn = db()
         cur = conn.cursor()
@@ -95,15 +89,13 @@ def registro():
             conn.commit()
             conn.close()
             return redirect('/')
-        except sqlite3.IntegrityError:
+        except:
             conn.close()
-            return render_template('register.html', error="❌ Usuario ya existe")
+            return render_template('register.html', error="Usuario ya existe")
 
     return render_template('register.html')
 
-# =========================
-# USUARIO
-# =========================
+# ================= USUARIO =================
 @app.route('/usuario')
 def usuario():
     if 'user' not in session:
@@ -121,16 +113,13 @@ def usuario():
     JOIN libros ON libros.id = prestamos.libro_id
     WHERE prestamos.usuario=?
     """, (session['user'],))
-
     prestamos = cur.fetchall()
 
     conn.close()
 
     return render_template('usuario.html', libros=libros, prestamos=prestamos)
 
-# =========================
-# ADMIN
-# =========================
+# ================= ADMIN =================
 @app.route('/admin', methods=['GET','POST'])
 def admin():
     if 'user' not in session or session['user'] != 'admin':
@@ -140,13 +129,20 @@ def admin():
     cur = conn.cursor()
 
     if request.method == 'POST':
-        titulo = request.form.get('titulo')
-        autor = request.form.get('autor')
+        titulo = request.form['titulo']
+        autor = request.form['autor']
+        file = request.files['imagen']
 
-        if titulo and autor:
-            cur.execute("INSERT INTO libros(titulo,autor,imagen,disponible) VALUES(?,?,?,1)",
-                        (titulo, autor, 'default.png'))
-            conn.commit()
+        nombre = 'default.png'
+
+        if file and file.filename != '':
+            path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+            file.save(path)
+            nombre = file.filename
+
+        cur.execute("INSERT INTO libros(titulo,autor,imagen,disponible) VALUES(?,?,?,1)",
+                    (titulo, autor, nombre))
+        conn.commit()
 
     cur.execute("SELECT * FROM libros")
     libros = cur.fetchall()
@@ -155,9 +151,17 @@ def admin():
 
     return render_template('admin.html', libros=libros)
 
-# =========================
-# PRESTAR
-# =========================
+# ================= ELIMINAR =================
+@app.route('/eliminar/<int:id>')
+def eliminar(id):
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM libros WHERE id=?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect('/admin')
+
+# ================= PRESTAR =================
 @app.route('/prestar/<int:id>', methods=['POST'])
 def prestar(id):
     conn = db()
@@ -169,12 +173,9 @@ def prestar(id):
 
     conn.commit()
     conn.close()
-
     return redirect('/usuario')
 
-# =========================
-# DEVOLVER
-# =========================
+# ================= DEVOLVER =================
 @app.route('/devolver/<int:id>', methods=['POST'])
 def devolver(id):
     conn = db()
@@ -185,12 +186,22 @@ def devolver(id):
 
     conn.commit()
     conn.close()
-
     return redirect('/usuario')
 
-# =========================
-# LOGOUT
-# =========================
+# ================= BUSCAR =================
+@app.route('/buscar')
+def buscar():
+    q = request.args.get('q')
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM libros WHERE titulo LIKE ?", ('%'+q+'%',))
+    libros = cur.fetchall()
+    conn.close()
+
+    return render_template('usuario.html', libros=libros, prestamos=[])
+
+# ================= LOGOUT =================
 @app.route('/logout')
 def logout():
     session.clear()
