@@ -1,46 +1,84 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Login</title>
+<title>Usuario</title>
 
 <style>
 body{
-    background: linear-gradient(135deg,#020617,#0f172a);
-    color:white;
+    margin:0;
     font-family:Arial;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    height:100vh;
+    background:#020617;
+    color:white;
 }
-.box{
+
+/* HEADER */
+.header{
+    background:#0f172a;
+    padding:15px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+/* GRID LIBROS */
+.grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
+    gap:20px;
+    padding:20px;
+}
+
+/* CARD */
+.card{
     background:#1e293b;
-    padding:30px;
-    border-radius:15px;
-    width:300px;
+    border-radius:12px;
+    overflow:hidden;
+    transition:0.3s;
+}
+.card:hover{
+    transform:scale(1.05);
+}
+
+/* IMAGEN */
+.card img{
+    width:100%;
+    height:250px;
+    object-fit:cover;
+}
+
+/* CONTENIDO */
+.card-body{
+    padding:10px;
     text-align:center;
 }
-input{
-    width:90%;
-    padding:10px;
-    margin:10px;
-    border:none;
-    border-radius:8px;
-}
+
+/* BOTONES */
 button{
-    width:95%;
-    padding:10px;
-    background:#22c55e;
+    background:#3b82f6;
     border:none;
+    padding:8px 12px;
     color:white;
-    border-radius:8px;
+    border-radius:6px;
     cursor:pointer;
 }
-.error{
-    background:#ef4444;
-    padding:10px;
-    border-radius:8px;
-    margin-bottom:10px;
+
+button:hover{
+    background:#2563eb;
+}
+
+/* SECCIONES */
+.section{
+    padding:20px;
+}
+
+.loan{
+    background:#1e293b;
+    padding:15px;
+    margin:10px;
+    border-radius:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
 }
 </style>
 
@@ -48,24 +86,74 @@ button{
 
 <body>
 
-<div class="box">
-
-<h2>📚 Biblioteca</h2>
-
-{% if error %}
-<div class="error">
-    {{ error }}
+<!-- HEADER -->
+<div class="header">
+    <h3>👤 {{ session.get('user') }}</h3>
+    <a href="/logout" style="color:red;">Salir</a>
 </div>
+
+<!-- LIBROS -->
+<div class="section">
+<h2>📚 Libros disponibles</h2>
+
+{% if libros %}
+<div class="grid">
+
+{% for l in libros %}
+<div class="card">
+
+<img src="{{ url_for('static', filename='uploads/' + (l[3] or 'default.png')) }}">
+
+<div class="card-body">
+<h4>{{ l[1] }}</h4>
+<p style="color:#94a3b8;">{{ l[2] }}</p>
+
+{% if l[4]==1 %}
+<a href="/prestar/{{ l[0] }}">
+<button>📥 Pedir libro</button>
+</a>
+{% else %}
+<p style="color:red;">❌ No disponible</p>
 {% endif %}
+</div>
 
-<form method="POST">
-<input name="user" placeholder="Usuario" required>
-<input type="password" name="password" placeholder="Contraseña" required>
-<button>Ingresar</button>
-</form>
+</div>
+{% endfor %}
 
-<br>
-<a href="/register" style="color:#38bdf8;">Crear cuenta</a>
+</div>
+{% else %}
+<p>No hay libros aún</p>
+{% endif %}
+</div>
+
+<!-- PRESTAMOS -->
+<div class="section">
+<h2>📖 Mis préstamos</h2>
+
+{% if prestamos %}
+    {% for p in prestamos %}
+    <div class="loan">
+
+        <div>
+            <b>{{ p[1] }}</b><br>
+            <small style="color:#94a3b8;">Fecha: {{ p[2] }}</small>
+        </div>
+
+        <div>
+        {% if p[3]==0 %}
+            <a href="/devolver/{{ p[0] }}">
+                <button>Devolver</button>
+            </a>
+        {% else %}
+            <span style="color:lightgreen;">✔ Devuelto</span>
+        {% endif %}
+        </div>
+
+    </div>
+    {% endfor %}
+{% else %}
+<p>No tienes préstamos</p>
+{% endif %}
 
 </div>
 
