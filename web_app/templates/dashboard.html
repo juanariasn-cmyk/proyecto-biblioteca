@@ -1,76 +1,93 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Biblioteca PRO</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<title>Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body { background:#0b0b0b; color:white; }
-.card { background:#181818; border-radius:12px; }
-.book-img { width:100%; height:180px; object-fit:cover; }
+body {
+    background: #111;
+    color: white;
+    font-family: Arial;
+}
+
+.scroll {
+    display: flex;
+    overflow-x: auto;
+}
+
+.card {
+    min-width: 180px;
+    margin: 10px;
+    background: #222;
+    padding: 10px;
+    border-radius: 10px;
+}
+img { width:100%; border-radius:10px; }
 </style>
 </head>
 
 <body>
 
-<nav class="navbar navbar-dark bg-dark p-3">
-<span>📚 Biblioteca PRO</span>
-<div>
-{{ session['user'] }} ({{ rol }})
-<a href="/logout" class="btn btn-danger btn-sm">Salir</a>
-</div>
-</nav>
+<h1>🎬 Bienvenido {{ session.user }}</h1>
 
-<div class="container mt-4">
-
-{% with messages = get_flashed_messages() %}
-{% if messages %}
-<div class="alert alert-info text-center">
-{{ messages[0] }}
-</div>
-{% endif %}
-{% endwith %}
-
-{% if rol == "admin" %}
-<div class="card p-3 mb-4">
-<h5>👑 Agregar libro</h5>
-
-<form action="/add" method="POST" enctype="multipart/form-data">
-
-<input name="nombre" class="form-control mb-2" placeholder="Nombre" required>
-<input name="autor" class="form-control mb-2" placeholder="Autor" required>
-<input type="file" name="imagen" class="form-control mb-2" required>
-
-<button class="btn btn-success w-100">Subir</button>
-
-</form>
-</div>
-{% endif %}
-
-<div class="row">
-{% for libro in libros %}
-<div class="col-md-3 mb-4">
-<div class="card p-2 text-center">
-
-<img src="{{ libro[3] }}" class="book-img">
-
-<h5>{{ libro[1] }}</h5>
-<p>{{ libro[2] }}</p>
-
-{% if libro[0] in prestados %}
-<a href="/devolver/{{ libro[0] }}" class="btn btn-success">Devolver</a>
-{% else %}
-<a href="/prestar/{{ libro[0] }}" class="btn btn-warning">Prestar</a>
-{% endif %}
-
-</div>
+<h2>🔥 Recomendados</h2>
+<div class="scroll">
+{% for l in recomendados %}
+<div class="card">
+<img src="{{ url_for('static', filename='uploads/' + l[3]) }}">
+<p>{{ l[1] }}</p>
+<a href="/prestar/{{ l[0] }}">📥</a>
 </div>
 {% endfor %}
 </div>
 
+<h2>📚 Todos</h2>
+<div class="scroll">
+{% for l in libros %}
+<div class="card">
+<img src="{{ url_for('static', filename='uploads/' + l[3]) }}">
+<p>{{ l[1] }}</p>
+
+{% if l[4]==1 %}
+<a href="/prestar/{{ l[0] }}">📥</a>
+{% else %}
+❌
+{% endif %}
 </div>
+{% endfor %}
+</div>
+
+<h2>📊 Estadísticas</h2>
+<canvas id="grafica"></canvas>
+
+<script>
+new Chart(document.getElementById("grafica"), {
+    type: "bar",
+    data: {
+        labels: ["Prestados", "Devueltos"],
+        datasets: [{
+            data: [
+                {{ prestamos|selectattr(3,'equalto',0)|list|length }},
+                {{ prestamos|selectattr(3,'equalto',1)|list|length }}
+            ]
+        }]
+    }
+});
+</script>
+
+<h2>💸 Multas</h2>
+{% for p in prestamos %}
+<div>
+{{ p[1] }}
+
+{% if p[4] > 5 and p[3]==0 %}
+⚠ ${{ (p[4]-5)*1000 }}
+{% endif %}
+</div>
+{% endfor %}
+
+<a href="/logout">Salir</a>
 
 </body>
 </html>
