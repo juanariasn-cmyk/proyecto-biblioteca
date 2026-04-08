@@ -4,13 +4,11 @@ import os
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = "super_secret_key"
+app.secret_key = "secret123"
 
-# conexión DB
 def db():
     return sqlite3.connect("db.db", check_same_thread=False)
 
-# crear tablas automáticamente
 def init_db():
     conn = db()
     cur = conn.cursor()
@@ -52,9 +50,10 @@ def login():
             session["user"] = u
             return redirect("/dashboard")
         else:
-            flash("Usuario o contraseña incorrectos")
+            flash("Credenciales incorrectas")
 
     return render_template("login.html")
+
 
 # 🧾 REGISTRO
 @app.route("/register", methods=["GET","POST"])
@@ -65,15 +64,17 @@ def register():
 
         conn = db()
         cur = conn.cursor()
+
         try:
             cur.execute("INSERT INTO users (user, pass) VALUES (?,?)", (u,p))
             conn.commit()
-            flash("Usuario creado correctamente")
+            flash("Usuario creado")
             return redirect("/")
         except:
-            flash("El usuario ya existe")
+            flash("Usuario ya existe")
 
     return render_template("register.html")
+
 
 # 📊 DASHBOARD
 @app.route("/dashboard")
@@ -94,6 +95,7 @@ def dashboard():
                            libros=libros,
                            total_libros=total_libros)
 
+
 # ➕ AGREGAR LIBRO
 @app.route("/add", methods=["POST"])
 def add():
@@ -108,7 +110,8 @@ def add():
     flash("Libro agregado")
     return redirect("/dashboard")
 
-# ❌ ELIMINAR LIBRO
+
+# ❌ ELIMINAR
 @app.route("/delete/<int:id>")
 def delete(id):
     conn = db()
@@ -119,11 +122,13 @@ def delete(id):
     flash("Libro eliminado")
     return redirect("/dashboard")
 
+
 # 🚪 LOGOUT
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
+
 
 # 🔥 CONFIG RENDER
 if __name__ == "__main__":
