@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, redirect, session, flash
 import sqlite3, os
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = "secret123"
@@ -47,7 +47,7 @@ def init_db():
     )
     """)
 
-    # admin
+    # Crear admin
     cur.execute("SELECT * FROM users WHERE user='admin'")
     if not cur.fetchone():
         cur.execute(
@@ -124,7 +124,7 @@ def dashboard():
         rol=session.get("rol")
     )
 
-# AGREGAR LIBRO (CON ARCHIVO)
+# AGREGAR LIBRO
 @app.route("/add", methods=["POST"])
 def add():
     if session.get("rol") != "admin":
@@ -133,7 +133,12 @@ def add():
     nombre = request.form["nombre"]
     autor = request.form["autor"]
 
-    file = request.files["imagen"]
+    file = request.files.get("imagen")
+
+    if not file or file.filename == "":
+        flash("❌ Debes subir una imagen")
+        return redirect("/dashboard")
+
     filename = secure_filename(file.filename)
     path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(path)
@@ -146,7 +151,7 @@ def add():
     )
     conn.commit()
 
-    flash("Libro agregado")
+    flash("📚 Libro agregado")
     return redirect("/dashboard")
 
 # PRESTAR
@@ -157,7 +162,7 @@ def prestar(id):
 
     cur.execute("SELECT * FROM prestamos WHERE libro_id=? AND devuelto=0", (id,))
     if cur.fetchone():
-        flash("Libro ocupado")
+        flash("❌ Libro ocupado")
         return redirect("/dashboard")
 
     hoy = datetime.now()
@@ -169,7 +174,7 @@ def prestar(id):
     """, (id, session["user"], hoy.strftime("%Y-%m-%d"), devolucion.strftime("%Y-%m-%d")))
 
     conn.commit()
-    flash("Libro prestado")
+    flash("📖 Libro prestado")
     return redirect("/dashboard")
 
 # DEVOLVER
@@ -180,7 +185,7 @@ def devolver(id):
     cur.execute("UPDATE prestamos SET devuelto=1 WHERE libro_id=? AND devuelto=0", (id,))
     conn.commit()
 
-    flash("Libro devuelto")
+    flash("✅ Libro devuelto")
     return redirect("/dashboard")
 
 # LOGOUT
