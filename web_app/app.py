@@ -1,14 +1,13 @@
-from flask import Flask, render_template, request, redirect, session
-import sqlite3, os
+from flask import Flask, render_template, request, redirect, session, Response
+import sqlite3, os, csv
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = "pro123"
-UPLOAD_FOLDER = "static/uploads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.secret_key = "empresa123"
 
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+UPLOAD_FOLDER = "static/uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 def db():
     return sqlite3.connect("db.db")
@@ -41,7 +40,6 @@ init_db()
 @app.route("/", methods=["GET","POST"])
 def login():
     error = None
-
     if request.method == "POST":
         u = request.form["user"]
         p = request.form["password"]
@@ -56,9 +54,7 @@ def login():
             session["user"] = user[1]
             session["rol"] = user[3]
 
-            if user[3] == "admin":
-                return redirect("/admin")
-            return redirect("/dashboard")
+            return redirect("/admin" if user[3]=="admin" else "/dashboard")
         else:
             error = "❌ Usuario o contraseña incorrectos"
 
@@ -73,7 +69,7 @@ def register():
 
         conn = db()
         cur = conn.cursor()
-        cur.execute("INSERT INTO users VALUES (NULL, ?, ?, 'user')", (u,p))
+        cur.execute("INSERT INTO users VALUES (NULL,?,?, 'user')", (u,p))
         conn.commit()
         conn.close()
 
@@ -102,16 +98,9 @@ def dashboard():
     """, (session["user"],))
 
     prestamos = cur.fetchall()
-
-    # 🔥 RECOMENDADOR (libros disponibles)
-    recomendados = [l for l in libros if l[4] == 1][:5]
-
     conn.close()
 
-    return render_template("dashboard.html",
-                           libros=libros,
-                           prestamos=prestamos,
-                           recomendados=recomendados)
+    return render_template("dashboard.html", libros=libros, prestamos=prestamos)
 
 # ================= ADMIN =================
 @app.route("/admin")
@@ -128,11 +117,22 @@ def admin():
     cur.execute("SELECT * FROM users")
     users = cur.fetchall()
 
+    cur.execute("""
+    SELECT prestamos.id, users.user, libros.titulo, prestamos.fecha,
+    prestamos.devuelto,
+    julianday('now') - julianday(prestamos.fecha)
+    FROM prestamos
+    JOIN libros ON libros.id = prestamos.libro_id
+    JOIN users ON users.user = prestamos.user
+    """)
+    prestamos = cur.fetchall()
+
     conn.close()
 
-    return render_template("admin.html", libros=libros, users=users)
+    return render_template("admin.html",
+        libros=libros, users=users, prestamos=prestamos)
 
-# ================= ADD BOOK =================
+# ================= ADD =================
 @app.route("/add_book", methods=["POST"])
 def add_book():
     titulo = request.form["titulo"]
@@ -140,13 +140,11 @@ def add_book():
     file = request.files["imagen"]
 
     filename = file.filename
-    path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    file.save(path)
+    file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
 
     conn = db()
     cur = conn.cursor()
-    cur.execute("INSERT INTO libros VALUES (NULL, ?, ?, ?, 1)",
-                (titulo, autor, filename))
+    cur.execute("INSERT INTO libros VALUES (NULL,?,?,?,1)", (titulo, autor, filename))
     conn.commit()
     conn.close()
 
@@ -158,20 +156,12 @@ def prestar(id):
     conn = db()
     cur = conn.cursor()
 
-    cur.execute("SELECT disponible FROM libros WHERE id=?", (id,))
-    libro = cur.fetchone()
-
-    if libro and libro[0] == 1:
-        fecha = datetime.now().strftime("%Y-%m-%d")
-
-        cur.execute("INSERT INTO prestamos VALUES (NULL, ?, ?, ?, 0)",
-                    (session["user"], id, fecha))
-
-        cur.execute("UPDATE libros SET disponible=0 WHERE id=?", (id,))
+    cur.execute("UPDATE libros SET disponible=0 WHERE id=?", (id,))
+    cur.execute("INSERT INTO prestamos VALUES (NULL,?,?,?,0)",
+                (session["user"], id, datetime.now().strftime("%Y-%m-%d")))
 
     conn.commit()
     conn.close()
-
     return redirect("/dashboard")
 
 # ================= DEVOLVER =================
@@ -185,8 +175,51 @@ def devolver(id):
 
     conn.commit()
     conn.close()
-
     return redirect("/dashboard")
+
+# ================= EXPORT CSV =================
+@app.route("/export")
+def export():
+    conn = db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT users.user, libros.titulo, prestamos.fecha, prestamos.devuelto
+    FROM prestamos
+    JOIN libros ON libros.id = prestamos.libro_id
+    JOIN users ON users.user = prestamos.user
+    """)
+
+    data = cur.fetchall()
+
+    def generate():
+        yield "Usuario,Libro,Fecha,Estado\n"
+        for row in data:
+            estado = "Devuelto" if row[3] else "Prestado"
+            yield f"{row[0]},{row[1]},{row[2]},{estado}\n"
+
+    return Response(generate(), mimetype="text/csv",
+                    headers={"Content-Disposition":"attachment;filename=reporte.csv"})
+
+# ================= API =================
+@app.route("/api/libros")
+def api_libros():
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM libros")
+    libros = cur.fetchall()
+
+    lista = []
+    for l in libros:
+        lista.append({
+            "id": l[0],
+            "titulo": l[1],
+            "autor": l[2],
+            "imagen": l[3],
+            "disponible": l[4]
+        })
+
+    return {"libros": lista}
 
 # ================= LOGOUT =================
 @app.route("/logout")
@@ -194,6 +227,5 @@ def logout():
     session.clear()
     return redirect("/")
 
-# ================= RUN =================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
