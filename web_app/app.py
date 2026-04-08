@@ -42,7 +42,7 @@ def crear_db():
     )
     """)
 
-    # ADMIN AUTO
+    # ADMIN
     cur.execute("SELECT * FROM users WHERE usuario='admin'")
     if not cur.fetchone():
         cur.execute("INSERT INTO users(usuario,password) VALUES('admin','123')")
@@ -76,7 +76,7 @@ def login():
     return render_template('login.html')
 
 # =========================
-# REGISTRO (ARREGLADO 🔥)
+# REGISTRO (ARREGLADO)
 # =========================
 @app.route('/registro', methods=['GET','POST'])
 def registro():
@@ -85,7 +85,7 @@ def registro():
         p = request.form.get('password')
 
         if not u or not p:
-            return render_template('registro.html', error="Completa todos los campos")
+            return render_template('register.html', error="Completa todos los campos")
 
         conn = db()
         cur = conn.cursor()
@@ -97,12 +97,9 @@ def registro():
             return redirect('/')
         except sqlite3.IntegrityError:
             conn.close()
-            return render_template('registro.html', error="❌ Usuario ya existe")
-        except Exception as e:
-            conn.close()
-            return render_template('registro.html', error="Error inesperado")
+            return render_template('register.html', error="❌ Usuario ya existe")
 
-    return render_template('registro.html')
+    return render_template('register.html')
 
 # =========================
 # USUARIO
