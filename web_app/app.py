@@ -1,8 +1,9 @@
 from flask import Flask, render_template, request, redirect, session
+from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3, os
 
 app = Flask(__name__)
-app.secret_key = "hacker_mode"
+app.secret_key = "ingeniero_pro"
 
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -46,7 +47,8 @@ def crear_db():
     # ADMIN AUTO
     cur.execute("SELECT * FROM users WHERE usuario='admin'")
     if not cur.fetchone():
-        cur.execute("INSERT INTO users(usuario,password) VALUES('admin','123')")
+        cur.execute("INSERT INTO users(usuario,password) VALUES(?,?)",
+                    ("admin", generate_password_hash("123")))
 
     conn.commit()
     conn.close()
@@ -62,15 +64,15 @@ def login():
 
         conn = db()
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE usuario=? AND password=?", (u,p))
+        cur.execute("SELECT * FROM users WHERE usuario=?", (u,))
         user = cur.fetchone()
         conn.close()
 
-        if user:
+        if user and check_password_hash(user[2], p):
             session['user'] = u
             return redirect('/admin' if u == 'admin' else '/usuario')
 
-        return render_template('login.html', error="Datos incorrectos")
+        return render_template('login.html', error="❌ Datos incorrectos")
 
     return render_template('login.html')
 
@@ -85,7 +87,8 @@ def registro():
         cur = conn.cursor()
 
         try:
-            cur.execute("INSERT INTO users(usuario,password) VALUES(?,?)", (u,p))
+            cur.execute("INSERT INTO users(usuario,password) VALUES(?,?)",
+                        (u, generate_password_hash(p)))
             conn.commit()
             conn.close()
             return redirect('/')
@@ -113,6 +116,7 @@ def usuario():
     JOIN libros ON libros.id = prestamos.libro_id
     WHERE prestamos.usuario=?
     """, (session['user'],))
+
     prestamos = cur.fetchall()
 
     conn.close()
