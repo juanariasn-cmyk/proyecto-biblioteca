@@ -1,9 +1,9 @@
-from flask import Flask, render_template, request, redirect, session, Response
-import sqlite3, os, csv
+from flask import Flask, render_template, request, redirect, session
+import sqlite3, os
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = "empresa123"
+app.secret_key = "pro123"
 
 UPLOAD_FOLDER = "static/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -31,7 +31,7 @@ def init_db():
         user TEXT, libro_id INTEGER,
         fecha TEXT, devuelto INTEGER DEFAULT 0)""")
 
-    # 🔥 CREAR ADMIN AUTOMÁTICO
+    # 🔥 ADMIN
     cur.execute("SELECT * FROM users WHERE user='admin'")
     if not cur.fetchone():
         cur.execute("INSERT INTO users (user, pass, rol) VALUES (?,?,?)",
@@ -60,13 +60,9 @@ def login():
         if user:
             session["user"] = user[1]
             session["rol"] = user[3]
-
-            if user[3] == "admin":
-                return redirect("/admin")
-            else:
-                return redirect("/dashboard")
+            return redirect("/admin" if user[3]=="admin" else "/dashboard")
         else:
-            error = "❌ Usuario o contraseña incorrectos"
+            error = "❌ Datos incorrectos"
 
     return render_template("login.html", error=error)
 
@@ -100,14 +96,14 @@ def dashboard():
     libros = cur.fetchall()
 
     cur.execute("""
-    SELECT prestamos.id, libros.titulo, prestamos.fecha, prestamos.devuelto,
-    julianday('now') - julianday(prestamos.fecha)
+    SELECT prestamos.id, libros.titulo, prestamos.fecha, prestamos.devuelto
     FROM prestamos
     JOIN libros ON libros.id = prestamos.libro_id
     WHERE prestamos.user=?
     """, (session["user"],))
 
     prestamos = cur.fetchall()
+
     conn.close()
 
     return render_template("dashboard.html", libros=libros, prestamos=prestamos)
@@ -128,9 +124,7 @@ def admin():
     users = cur.fetchall()
 
     cur.execute("""
-    SELECT prestamos.id, users.user, libros.titulo, prestamos.fecha,
-    prestamos.devuelto,
-    julianday('now') - julianday(prestamos.fecha)
+    SELECT prestamos.id, users.user, libros.titulo, prestamos.fecha, prestamos.devuelto
     FROM prestamos
     JOIN libros ON libros.id = prestamos.libro_id
     JOIN users ON users.user = prestamos.user
@@ -166,16 +160,26 @@ def add_book():
 # ================= PRESTAR =================
 @app.route("/prestar/<int:id>")
 def prestar(id):
+    if "user" not in session:
+        return redirect("/")
+
     conn = db()
     cur = conn.cursor()
 
-    cur.execute("UPDATE libros SET disponible=0 WHERE id=?", (id,))
-    cur.execute("INSERT INTO prestamos VALUES (NULL,?,?,?,0)",
-                (session["user"], id, datetime.now().strftime("%Y-%m-%d")))
+    cur.execute("SELECT disponible FROM libros WHERE id=?", (id,))
+    libro = cur.fetchone()
 
-    conn.commit()
+    if libro and libro[0] == 1:
+        fecha = datetime.now().strftime("%Y-%m-%d")
+
+        cur.execute("INSERT INTO prestamos VALUES (NULL,?,?,?,0)",
+                    (session["user"], id, fecha))
+
+        cur.execute("UPDATE libros SET disponible=0 WHERE id=?", (id,))
+
+        conn.commit()
+
     conn.close()
-
     return redirect("/dashboard")
 
 # ================= DEVOLVER =================
@@ -189,31 +193,8 @@ def devolver(id):
 
     conn.commit()
     conn.close()
+
     return redirect("/dashboard")
-
-# ================= EXPORT CSV =================
-@app.route("/export")
-def export():
-    conn = db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT users.user, libros.titulo, prestamos.fecha, prestamos.devuelto
-    FROM prestamos
-    JOIN libros ON libros.id = prestamos.libro_id
-    JOIN users ON users.user = prestamos.user
-    """)
-
-    data = cur.fetchall()
-
-    def generate():
-        yield "Usuario,Libro,Fecha,Estado\n"
-        for row in data:
-            estado = "Devuelto" if row[3] else "Prestado"
-            yield f"{row[0]},{row[1]},{row[2]},{estado}\n"
-
-    return Response(generate(), mimetype="text/csv",
-                    headers={"Content-Disposition":"attachment;filename=reporte.csv"})
 
 # ================= LOGOUT =================
 @app.route("/logout")
