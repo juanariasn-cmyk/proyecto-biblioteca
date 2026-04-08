@@ -1,54 +1,72 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Panel Biblioteca</title>
-    <style>
-        body { font-family: Arial; background: #0f172a; color: white; }
-        h1 { text-align: center; }
-        .container { width: 80%; margin: auto; }
-        input, button { padding: 10px; margin: 5px; }
-        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
-        th, td { padding: 10px; border-bottom: 1px solid gray; }
-        a { color: red; }
-        .box { background: #1e293b; padding: 20px; border-radius: 10px; }
-    </style>
+    <title>Biblioteca Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
 
-<div class="container">
-    <h1>📚 Panel Biblioteca</h1>
+<body class="bg-dark text-white">
 
-    <div class="box">
-        <form action="/add" method="POST">
-            <input type="text" name="nombre" placeholder="Nombre del libro" required>
-            <input type="text" name="autor" placeholder="Autor" required>
-            <button type="submit">Agregar</button>
-        </form>
+<nav class="navbar navbar-dark bg-black px-4">
+    <span class="navbar-brand">📚 Biblioteca Pro</span>
+    <a href="/logout" class="btn btn-danger">Salir</a>
+</nav>
+
+<div class="container mt-4">
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <div class="card bg-secondary text-white p-3">
+                <h4>Total Libros</h4>
+                <h2>{{ total }}</h2>
+            </div>
+        </div>
     </div>
 
-    <div class="box">
-        <h2>Libros</h2>
-        <table>
-            <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Autor</th>
-                <th>Acción</th>
-            </tr>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="alert alert-success">
+                {{ messages[0] }}
+            </div>
+        {% endif %}
+    {% endwith %}
 
-            {% for libro in libros %}
-            <tr>
-                <td>{{ libro[0] }}</td>
-                <td>{{ libro[1] }}</td>
-                <td>{{ libro[2] }}</td>
-                <td><a href="/delete/{{ libro[0] }}">Eliminar</a></td>
-            </tr>
-            {% endfor %}
-        </table>
-    </div>
+    <form action="/search" method="POST" class="mb-3">
+        <input type="text" name="query" class="form-control" placeholder="Buscar libro...">
+    </form>
 
-    <br>
-    <a href="/logout">Cerrar sesión</a>
+    <form action="/add" method="POST" class="row g-2 mb-4">
+        <div class="col">
+            <input type="text" name="nombre" class="form-control" placeholder="Nombre" required>
+        </div>
+        <div class="col">
+            <input type="text" name="autor" class="form-control" placeholder="Autor" required>
+        </div>
+        <div class="col">
+            <button class="btn btn-success w-100">Agregar</button>
+        </div>
+    </form>
+
+    <table class="table table-dark table-striped">
+        <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Autor</th>
+            <th></th>
+        </tr>
+
+        {% for libro in libros %}
+        <tr>
+            <td>{{ libro[0] }}</td>
+            <td>{{ libro[1] }}</td>
+            <td>{{ libro[2] }}</td>
+            <td>
+                <a href="/delete/{{ libro[0] }}" class="btn btn-danger btn-sm">Eliminar</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
 </div>
 
 </body>
