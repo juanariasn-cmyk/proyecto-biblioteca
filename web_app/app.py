@@ -32,7 +32,7 @@ def init_db():
         libro_id INTEGER,
         fecha TEXT)""")
 
-    # ADMIN POR DEFECTO
+    # ADMIN
     cur.execute("SELECT * FROM users WHERE user='admin'")
     if not cur.fetchone():
         cur.execute("INSERT INTO users (user, pass, rol) VALUES ('admin','1234','admin')")
@@ -47,10 +47,6 @@ init_db()
 def login():
     error = None
 
-    # 🔥 FORZAR LOGIN SIEMPRE
-    if "user" in session:
-        session.clear()
-
     if request.method == "POST":
         u = request.form["user"]
         p = request.form["password"]
@@ -62,35 +58,31 @@ def login():
         conn.close()
 
         if user:
+            session.clear()
             session["user"] = user[1]
             session["rol"] = user[3]
 
-            return redirect("/admin" if user[3]=="admin" else "/dashboard")
+            if user[3] == "admin":
+                return redirect("/admin")
+            else:
+                return redirect("/dashboard")
         else:
             error = "❌ Usuario o contraseña incorrectos"
 
     return render_template("login.html", error=error)
 
-# ================= REGISTER =================
-@app.route("/register", methods=["POST"])
-def register():
-    u = request.form["user"]
-    p = request.form["password"]
+# ================= PROTECCIÓN GLOBAL =================
+@app.before_request
+def proteger_rutas():
+    rutas_publicas = ["/"]
 
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO users (user, pass, rol) VALUES (?,?,'user')", (u,p))
-    conn.commit()
-    conn.close()
-
-    return redirect("/")
+    if request.path not in rutas_publicas:
+        if "user" not in session:
+            return redirect("/")
 
 # ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
-    if "user" not in session:
-        return redirect("/")
-
     conn = db()
     cur = conn.cursor()
 
@@ -98,7 +90,7 @@ def dashboard():
     libros = cur.fetchall()
 
     cur.execute("""
-        SELECT prestamos.libro_id, libros.titulo, prestamos.fecha
+        SELECT libros.titulo, prestamos.fecha
         FROM prestamos
         JOIN libros ON libros.id = prestamos.libro_id
         WHERE prestamos.usuario=?
@@ -113,8 +105,8 @@ def dashboard():
 # ================= ADMIN =================
 @app.route("/admin")
 def admin():
-    if "user" not in session or session["rol"] != "admin":
-        return redirect("/")
+    if session.get("rol") != "admin":
+        return redirect("/dashboard")
 
     conn = db()
     cur = conn.cursor()
@@ -155,9 +147,6 @@ def add_book():
 # ================= PRESTAR =================
 @app.route("/prestar/<int:id>", methods=["POST"])
 def prestar(id):
-    if "user" not in session:
-        return redirect("/")
-
     conn = db()
     cur = conn.cursor()
 
