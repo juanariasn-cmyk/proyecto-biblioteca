@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request, redirect, session, flash
-import sqlite3
-import os
+import sqlite3, os
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+app.secret_key = "super_secret"
 
 def db():
     return sqlite3.connect("db.db", check_same_thread=False)
@@ -12,40 +12,77 @@ def init_db():
     conn = db()
     cur = conn.cursor()
 
-    cur.execute("CREATE TABLE IF NOT EXISTS users (user TEXT, pass TEXT)")
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS books (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT,
-            autor TEXT
-        )
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user TEXT UNIQUE,
+        pass TEXT
+    )
     """)
 
-    # usuario default
-    cur.execute("SELECT * FROM users WHERE user='admin'")
-    if not cur.fetchone():
-        cur.execute("INSERT INTO users VALUES ('admin', '1234')")
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS books (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        autor TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS prestamos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        libro_id INTEGER,
+        usuario TEXT
+    )
+    """)
 
     conn.commit()
     conn.close()
 
 init_db()
 
+# 🔐 LOGIN
 @app.route("/", methods=["GET","POST"])
 def login():
     if request.method == "POST":
         u = request.form["user"]
         p = request.form["password"]
+
         conn = db()
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE user=? AND pass=?", (u,p))
-        if cur.fetchone():
+        cur.execute("SELECT pass FROM users WHERE user=?", (u,))
+        user = cur.fetchone()
+
+        if user and check_password_hash(user[0], p):
             session["user"] = u
             return redirect("/dashboard")
         else:
             flash("Credenciales incorrectas")
+
     return render_template("login.html")
 
+
+# 🧾 REGISTRO
+@app.route("/register", methods=["GET","POST"])
+def register():
+    if request.method == "POST":
+        u = request.form["user"]
+        p = generate_password_hash(request.form["password"])
+
+        conn = db()
+        cur = conn.cursor()
+        try:
+            cur.execute("INSERT INTO users (user, pass) VALUES (?,?)", (u,p))
+            conn.commit()
+            flash("Usuario creado")
+            return redirect("/")
+        except:
+            flash("Usuario ya existe")
+
+    return render_template("register.html")
+
+
+# 📊 DASHBOARD
 @app.route("/dashboard")
 def dashboard():
     if "user" not in session:
@@ -58,10 +95,18 @@ def dashboard():
     libros = cur.fetchall()
 
     cur.execute("SELECT COUNT(*) FROM books")
-    total = cur.fetchone()[0]
+    total_libros = cur.fetchone()[0]
 
-    return render_template("dashboard.html", libros=libros, total=total)
+    cur.execute("SELECT COUNT(*) FROM prestamos")
+    total_prestamos = cur.fetchone()[0]
 
+    return render_template("dashboard.html",
+                           libros=libros,
+                           total_libros=total_libros,
+                           total_prestamos=total_prestamos)
+
+
+# ➕ AGREGAR LIBRO
 @app.route("/add", methods=["POST"])
 def add():
     nombre = request.form["nombre"]
@@ -72,9 +117,11 @@ def add():
     cur.execute("INSERT INTO books (nombre, autor) VALUES (?,?)", (nombre, autor))
     conn.commit()
 
-    flash("Libro agregado correctamente")
+    flash("Libro agregado")
     return redirect("/dashboard")
 
+
+# ❌ ELIMINAR
 @app.route("/delete/<int:id>")
 def delete(id):
     conn = db()
@@ -85,6 +132,22 @@ def delete(id):
     flash("Libro eliminado")
     return redirect("/dashboard")
 
+
+# 📚 PRESTAR LIBRO
+@app.route("/prestar/<int:id>")
+def prestar(id):
+    user = session["user"]
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO prestamos (libro_id, usuario) VALUES (?,?)", (id,user))
+    conn.commit()
+
+    flash("Libro prestado")
+    return redirect("/dashboard")
+
+
+# 🔎 BUSCAR
 @app.route("/search", methods=["POST"])
 def search():
     query = request.form["query"]
@@ -94,12 +157,18 @@ def search():
     cur.execute("SELECT * FROM books WHERE nombre LIKE ?", ('%'+query+'%',))
     libros = cur.fetchall()
 
-    return render_template("dashboard.html", libros=libros, total=len(libros))
+    return render_template("dashboard.html",
+                           libros=libros,
+                           total_libros=len(libros),
+                           total_prestamos=0)
 
+
+# 🚪 LOGOUT
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
