@@ -2,17 +2,20 @@ from flask import Flask, render_template, request, redirect, session
 import sqlite3
 
 app = Flask(__name__)
-app.secret_key = "clave_final_123"
+app.secret_key = "ultra_pro_key"
 
 # =========================
-# CREAR DB
+# DB
 # =========================
+def db():
+    return sqlite3.connect('db.db')
+
 def crear_db():
-    conn = sqlite3.connect('db.db')
+    conn = db()
     cur = conn.cursor()
 
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
+    CREATE TABLE IF NOT EXISTS users(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         usuario TEXT UNIQUE,
         password TEXT
@@ -20,7 +23,7 @@ def crear_db():
     """)
 
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS libros (
+    CREATE TABLE IF NOT EXISTS libros(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         titulo TEXT,
         autor TEXT,
@@ -30,7 +33,7 @@ def crear_db():
     """)
 
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS prestamos (
+    CREATE TABLE IF NOT EXISTS prestamos(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         usuario TEXT,
         libro_id INTEGER,
@@ -39,10 +42,10 @@ def crear_db():
     )
     """)
 
-    # ADMIN
+    # ADMIN AUTO
     cur.execute("SELECT * FROM users WHERE usuario='admin'")
     if not cur.fetchone():
-        cur.execute("INSERT INTO users VALUES (NULL,'admin','123')")
+        cur.execute("INSERT INTO users(usuario,password) VALUES('admin','123')")
 
     conn.commit()
     conn.close()
@@ -55,10 +58,10 @@ crear_db()
 @app.route('/', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
-        u = request.form['usuario']
-        p = request.form['password']
+        u = request.form.get('usuario')
+        p = request.form.get('password')
 
-        conn = sqlite3.connect('db.db')
+        conn = db()
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE usuario=? AND password=?", (u,p))
         user = cur.fetchone()
@@ -66,36 +69,38 @@ def login():
 
         if user:
             session['user'] = u
+            return redirect('/admin' if u == 'admin' else '/usuario')
 
-            if u == "admin":
-                return redirect('/admin')
-            else:
-                return redirect('/usuario')
-
-        return render_template('login.html', error="Datos incorrectos")
+        return render_template('login.html', error="❌ Usuario o contraseña incorrectos")
 
     return render_template('login.html')
 
 # =========================
-# REGISTRO
+# REGISTRO (ARREGLADO 🔥)
 # =========================
 @app.route('/registro', methods=['GET','POST'])
 def registro():
     if request.method == 'POST':
-        u = request.form['usuario']
-        p = request.form['password']
+        u = request.form.get('usuario')
+        p = request.form.get('password')
 
-        conn = sqlite3.connect('db.db')
+        if not u or not p:
+            return render_template('registro.html', error="Completa todos los campos")
+
+        conn = db()
         cur = conn.cursor()
 
         try:
-            cur.execute("INSERT INTO users VALUES (NULL,?,?)", (u,p))
+            cur.execute("INSERT INTO users(usuario,password) VALUES(?,?)", (u,p))
             conn.commit()
             conn.close()
             return redirect('/')
-        except:
+        except sqlite3.IntegrityError:
             conn.close()
-            return render_template('registro.html', error="Usuario ya existe")
+            return render_template('registro.html', error="❌ Usuario ya existe")
+        except Exception as e:
+            conn.close()
+            return render_template('registro.html', error="Error inesperado")
 
     return render_template('registro.html')
 
@@ -107,7 +112,7 @@ def usuario():
     if 'user' not in session:
         return redirect('/')
 
-    conn = sqlite3.connect('db.db')
+    conn = db()
     cur = conn.cursor()
 
     cur.execute("SELECT * FROM libros")
@@ -117,8 +122,9 @@ def usuario():
     SELECT prestamos.id, libros.titulo, prestamos.fecha, prestamos.devuelto
     FROM prestamos
     JOIN libros ON libros.id = prestamos.libro_id
-    WHERE prestamos.usuario = ?
+    WHERE prestamos.usuario=?
     """, (session['user'],))
+
     prestamos = cur.fetchall()
 
     conn.close()
@@ -133,15 +139,17 @@ def admin():
     if 'user' not in session or session['user'] != 'admin':
         return redirect('/')
 
-    conn = sqlite3.connect('db.db')
+    conn = db()
     cur = conn.cursor()
 
     if request.method == 'POST':
-        titulo = request.form['titulo']
-        autor = request.form['autor']
+        titulo = request.form.get('titulo')
+        autor = request.form.get('autor')
 
-        cur.execute("INSERT INTO libros VALUES (NULL,?,?,?,1)", (titulo, autor, 'default.png'))
-        conn.commit()
+        if titulo and autor:
+            cur.execute("INSERT INTO libros(titulo,autor,imagen,disponible) VALUES(?,?,?,1)",
+                        (titulo, autor, 'default.png'))
+            conn.commit()
 
     cur.execute("SELECT * FROM libros")
     libros = cur.fetchall()
@@ -155,11 +163,12 @@ def admin():
 # =========================
 @app.route('/prestar/<int:id>', methods=['POST'])
 def prestar(id):
-    conn = sqlite3.connect('db.db')
+    conn = db()
     cur = conn.cursor()
 
     cur.execute("UPDATE libros SET disponible=0 WHERE id=?", (id,))
-    cur.execute("INSERT INTO prestamos VALUES (NULL,?,?,date('now'),0)", (session['user'], id))
+    cur.execute("INSERT INTO prestamos(usuario,libro_id,fecha,devuelto) VALUES(?,?,date('now'),0)",
+                (session['user'], id))
 
     conn.commit()
     conn.close()
@@ -171,7 +180,7 @@ def prestar(id):
 # =========================
 @app.route('/devolver/<int:id>', methods=['POST'])
 def devolver(id):
-    conn = sqlite3.connect('db.db')
+    conn = db()
     cur = conn.cursor()
 
     cur.execute("UPDATE prestamos SET devuelto=1 WHERE id=?", (id,))
@@ -190,8 +199,5 @@ def logout():
     session.clear()
     return redirect('/')
 
-# =========================
-# RUN
-# =========================
 if __name__ == '__main__':
     app.run(debug=True)
